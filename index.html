@@ -75,7 +75,7 @@ button:disabled{opacity:.45;cursor:default}
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const lc = document.createElement('canvas'), lx = lc.getContext('2d');
 const probe = document.getElementById('probe');
-let W = 0, H = 0, RS = 1, Q = (window.devicePixelRatio || 1) >= 2 ? .85 : 1, OX = 0, OY = 0, Z = 1, SAFE = 0;
+let Zb = 1, zoomK = 1, W = 0, H = 0, RS = 1, Q = (window.devicePixelRatio || 1) >= 2 ? .85 : 1, OX = 0, OY = 0, Z = 1, SAFE = 0;
 const DPR0 = Math.min(window.devicePixelRatio || 1, 2);
 const IX = .85, IY = .425, TAU = Math.PI * 2, PI4 = Math.PI / 4;
 const HAB = { x: 250, y: -340 };
@@ -86,7 +86,7 @@ function resize() {
   W = Math.min(innerWidth, Math.round(innerHeight * .62)); H = innerHeight; RS = DPR0 * Q;
   cv.width = Math.round(W * RS); cv.height = Math.round(H * RS); cv.style.width = W + 'px'; cv.style.height = H + 'px';
   lc.width = Math.ceil(cv.width / 2); lc.height = Math.ceil(cv.height / 2);
-  Z = Math.max(.6, Math.min(W / 440, 1.5)); OX = W / 2; OY = H * .54;
+  Zb = Math.max(.5, Math.min(W / 540, 1.3)); Z = Zb * zoomK; OX = W / 2; OY = H * .54;
   SAFE = parseFloat(getComputedStyle(probe).paddingTop) || 0; buildStatic();
 }
 function buildStatic() {
@@ -130,7 +130,7 @@ const SHADOW = (() => { const c = document.createElement('canvas'); c.width = 64
    ellipsoids, shaded per pixel, baked into direction sprites.
    ===================================================================== */
 const MATS = [];
-function mat(hex, o) { o = o || {}; const c = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]; MATS.push({ c, spec: o.spec || 0, shine: o.shine || 20, nz: o.nz === undefined ? .16 : o.nz, em: o.em || 0 }); return MATS.length - 1; }
+function mat(hex, o) { o = o || {}; const hx = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; const c = hx(hex); MATS.push({ c, c2: o.c2 ? hx(o.c2) : c, tex: o.tex || 0, bump: o.bump || 0, spec: o.spec || 0, shine: o.shine || 20, nz: o.nz === undefined ? .12 : o.nz, em: o.em || 0 }); return MATS.length - 1; }
 const M_STEEL = mat('#78818f', { spec: .35, shine: 24 }), M_STEELD = mat('#3b414c', { spec: .25 }), M_DARK = mat('#1e2229', { spec: .2 }), M_HZ = mat('#b8921c', { spec: .1 }),
   M_GLASS = mat('#3a9db5', { spec: .8, shine: 40, em: .5, nz: .05 }), M_EXH = mat('#ff8a30', { em: 1, nz: 0 }), M_RED = mat('#ff3a20', { em: 1, nz: 0 }),
   M_CHIT = mat('#5b4060', { spec: .5, shine: 28, nz: .2 }), M_CHITD = mat('#2b1f33', { spec: .35, shine: 20 }), M_BONE = mat('#b8aa86', { spec: .2, nz: .25 }), M_ACID = mat('#a2ec48', { em: .85, nz: .08 }),
@@ -141,6 +141,10 @@ const M_RUSTP = mat('#a05e30', { spec: .12, nz: .32 }), M_RUSTD = mat('#683a20',
   M_SK = mat('#9a8660', { spec: .35, shine: 22, nz: .22 }), M_SKD = mat('#4a3120', { spec: .25, nz: .2 }), M_SKR = mat('#b8431f', { spec: .3, nz: .15 }), M_EYE = mat('#ff6a24', { em: 1, nz: 0 }),
   M_RVC = mat('#46346a', { spec: .45, shine: 24, nz: .2 }), M_RVD = mat('#211838', { spec: .3, nz: .2 });
 const M_HOT = mat('#ff8a2a', { em: .85, nz: .1, spec: .2 });
+const M_RPT = mat('#a9643a', { spec: .14, shine: 12, tex: 1, c2: '#4a3a30', bump: .22 }), M_RPD = mat('#6f3f24', { tex: 1, c2: '#3a2a20', bump: .22 }), M_GRY = mat('#7a808a', { spec: .35, shine: 20, tex: 5, bump: .06 }), M_OLV = mat('#617046', { tex: 1, c2: '#38402a', bump: .18 }),
+  M_MET = mat('#3f4551', { spec: .45, shine: 26, tex: 5 }), M_HAZ = mat('#c79b1c', { tex: 3, c2: '#18181a' }), M_TRD = mat('#1c1c20', { tex: 4, c2: '#0d0d10' }),
+  M_CH = mat('#a48f66', { spec: .45, shine: 24, tex: 2, c2: '#5a3a28', bump: .28 }), M_CHP = mat('#603a28', { spec: .4, shine: 22, tex: 2, c2: '#2e1a14', bump: .24 }), M_CHD = mat('#33241a', { spec: .3, shine: 16, bump: .18 }), M_BN = mat('#cdbf9a', { spec: .3, shine: 18, tex: 5, bump: .12 }),
+  M_RV = mat('#58447f', { spec: .45, shine: 22, tex: 2, c2: '#2a1c44', bump: .3 }), M_RVD2 = mat('#2a1f42', { spec: .35, shine: 18, bump: .2 }), M_ICH = mat('#8fd445', { em: .6, nz: .1, spec: .5, shine: 30 });
 const V3 = { sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k], dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
   cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], norm: a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; } };
 function pushQuad(M, a, b, c, d, m, ctr) {
@@ -166,129 +170,239 @@ function ellip(M, cx, cy, cz, rx, ry, rz, m, seg, rings, yaw) {
     row.push([[cx + lx_ * cs - lz * sn, cy + ly, cz + lx_ * sn + lz * cs], [(nx * cs - nz * sn) / nl, ny / nl, (nx * sn + nz * cs) / nl]]); } G_.push(row); }
   for (let r = 0; r < rings; r++) for (let s = 0; s < seg; s++) { const s2 = (s + 1) % seg, A = G_[r][s], B = G_[r][s2], C = G_[r + 1][s2], D = G_[r + 1][s]; M.push([A[0], B[0], C[0], A[1], B[1], C[1], m], [A[0], C[0], D[0], A[1], C[1], D[1], m]); }
 }
-// light + view (model space; iso camera yaw 45deg, pitch 30deg)
-const LV_ = V3.norm([-.4, 1.1, .8]), VV_ = [.612, .5, .612];
-function rasterTris(tris, yaw, S, ox, oy, sc, aoH) {
-  const img = new ImageData(S, S), D = img.data, Zb = new Float32Array(S * S).fill(-1e9), cy_ = Math.cos(yaw), sy_ = Math.sin(yaw);
-  const hx = LV_[0] + VV_[0], hy = LV_[1] + VV_[1], hz = LV_[2] + VV_[2], hl = Math.hypot(hx, hy, hz);
-  for (const t of tris) {
-    const X = [0, 0, 0], Y = [0, 0, 0], Dp = [0, 0, 0], N = [null, null, null];
-    for (let i = 0; i < 3; i++) { const v = t[i], nn = t[3 + i], x = v[0] * cy_ - v[2] * sy_, z = v[0] * sy_ + v[2] * cy_; X[i] = ox + (x - z) * IX * sc; Y[i] = oy + (x + z) * IY * sc - v[1] * 1.04 * sc; Dp[i] = x * .612 + v[1] * .5 + z * .612; N[i] = [nn[0] * cy_ - nn[2] * sy_, nn[1], nn[0] * sy_ + nn[2] * cy_]; }
+// ===== sprite renderer v2: visibility buffer, supersampling, ambient occlusion, textures =====
+const LK = V3.norm([-.45, 1.0, .75]), LF = V3.norm([.8, .25, -.55]), VV_ = [.612, .5, .612], RD_ = V3.norm([.6, .3, -.75]);
+const HV_ = V3.norm([LK[0] + VV_[0], LK[1] + VV_[1], LK[2] + VV_[2]]), _tx = { t: 0, mu: 1 };
+function texEval(code, x, y, z) {
+  let t = 0, mu = 1;
+  if (code === 1) { const st = vn((x + z) * .22, y * .09); mu = .72 + .55 * st; if (hash(Math.floor((x + z) / 2.2), Math.floor(y / 2.2), 5) < .06) { t = 1; mu *= .9; } else if (st < .28) t = .35; }
+  else if (code === 2) { const u = (x + z) / 5.5, v = y / 5.5, fu = u - Math.floor(u), fv = v - Math.floor(v), b = Math.min(fu, 1 - fu, fv, 1 - fv); mu = b < .09 ? .5 : .88 + .24 * hash(Math.floor(u), Math.floor(v), 3); t = hash(Math.floor(u), Math.floor(v), 4) < .18 ? .6 : 0; }
+  else if (code === 3) t = Math.floor((x + y + z) / 4) & 1; else if (code === 4) { t = Math.floor((x + z) / 3) & 1; mu = t ? .8 : 1; } else if (code === 5) mu = .84 + .32 * vn((x + z) * .9, y * 2.4);
+  _tx.t = t; _tx.mu = mu;
+}
+function rasterTris(tris, yaw, S, ox, oy, sc, aoH, ss) {
+  ss = ss || 1.5; const N = Math.round(S * ss), ox2 = ox * ss, oy2 = oy * ss, sc2 = sc * ss, cy_ = Math.cos(yaw), sy_ = Math.sin(yaw), nT = tris.length;
+  const Tid = new Int32Array(N * N).fill(-1), Zb = new Float32Array(N * N).fill(-1e9), B0 = new Float32Array(N * N), B1 = new Float32Array(N * N); let bx0 = N, bx1 = 0, by0 = N, by1 = 0;
+  for (let ti = 0; ti < nT; ti++) {
+    const t = tris[ti], X = [0, 0, 0], Y = [0, 0, 0], Dp = [0, 0, 0];
+    for (let i = 0; i < 3; i++) { const v = t[i], x = v[0] * cy_ - v[2] * sy_, z = v[0] * sy_ + v[2] * cy_; X[i] = ox2 + (x - z) * IX * sc2; Y[i] = oy2 + (x + z) * IY * sc2 - v[1] * 1.04 * sc2; Dp[i] = x * .612 + v[1] * .5 + z * .612; }
     const area = (X[1] - X[0]) * (Y[2] - Y[0]) - (X[2] - X[0]) * (Y[1] - Y[0]); if (Math.abs(area) < 1e-6) continue;
-    const x0 = Math.max(0, Math.floor(Math.min(X[0], X[1], X[2]))), x1 = Math.min(S - 1, Math.ceil(Math.max(X[0], X[1], X[2]))), y0 = Math.max(0, Math.floor(Math.min(Y[0], Y[1], Y[2]))), y1 = Math.min(S - 1, Math.ceil(Math.max(Y[0], Y[1], Y[2])));
-    const m = MATS[t[6]];
+    const x0 = Math.max(0, Math.floor(Math.min(X[0], X[1], X[2]))), x1 = Math.min(N - 1, Math.ceil(Math.max(X[0], X[1], X[2]))), y0 = Math.max(0, Math.floor(Math.min(Y[0], Y[1], Y[2]))), y1 = Math.min(N - 1, Math.ceil(Math.max(Y[0], Y[1], Y[2])));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const px = x + .5, py = y + .5, w0 = ((X[1] - px) * (Y[2] - py) - (X[2] - px) * (Y[1] - py)) / area, w1 = ((X[2] - px) * (Y[0] - py) - (X[0] - px) * (Y[2] - py)) / area, w2 = 1 - w0 - w1;
-      if (w0 < -.002 || w1 < -.002 || w2 < -.002) continue; const dep = w0 * Dp[0] + w1 * Dp[1] + w2 * Dp[2], idx = y * S + x; if (dep <= Zb[idx]) continue; Zb[idx] = dep;
-      let nx = w0 * N[0][0] + w1 * N[1][0] + w2 * N[2][0], ny = w0 * N[0][1] + w1 * N[1][1] + w2 * N[2][1], nz = w0 * N[0][2] + w1 * N[1][2] + w2 * N[2][2]; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
-      const mx = w0 * t[0][0] + w1 * t[1][0] + w2 * t[2][0], my = w0 * t[0][1] + w1 * t[1][1] + w2 * t[2][1], mz = w0 * t[0][2] + w1 * t[1][2] + w2 * t[2][2];
-      const dl = Math.max(0, nx * LV_[0] + ny * LV_[1] + nz * LV_[2]), hemi = .3 + .2 * ny, rim = Math.pow(1 - Math.max(0, nx * VV_[0] + ny * VV_[1] + nz * VV_[2]), 3) * .3;
-      let sp = 0; if (m.spec) sp = Math.pow(Math.max(0, (nx * hx + ny * hy + nz * hz) / hl), m.shine) * m.spec;
-      const grain = (hash(x, y, 7) - .5) * m.nz + (hash(Math.floor(mx / 3), Math.floor(my / 3) + Math.floor(mz / 3) * 131, 9) - .5) * m.nz * 1.6;
-      const k = (hemi + .95 * dl) * (1 + grain) * (.7 + .3 * clamp(my / aoH, 0, 1)); let r = m.c[0] * k + sp * 255 + rim * 120, g = m.c[1] * k + sp * 255 + rim * 70, b = m.c[2] * k + sp * 255 + rim * 30;
-      if (m.em) { r = lerp(r, m.c[0], m.em); g = lerp(g, m.c[1], m.em); b = lerp(b, m.c[2], m.em); }
-      const o = idx * 4; D[o] = r > 255 ? 255 : r; D[o + 1] = g > 255 ? 255 : g; D[o + 2] = b > 255 ? 255 : b; D[o + 3] = 255;
+      if (w0 < -.002 || w1 < -.002 || w2 < -.002) continue; const dep = w0 * Dp[0] + w1 * Dp[1] + w2 * Dp[2], idx = y * N + x; if (dep <= Zb[idx]) continue; Zb[idx] = dep; Tid[idx] = ti; B0[idx] = w0; B1[idx] = w1;
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
     }
   }
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const o = (y * S + x) * 4; if (!D[o + 3]) continue; if (x === 0 || y === 0 || x === S - 1 || y === S - 1 || !D[o - 1] || !D[o + 7] || !D[o + 3 - S * 4] || !D[o + 3 + S * 4]) { D[o] *= .45; D[o + 1] *= .45; D[o + 2] *= .45; } }
-  const c = document.createElement('canvas'); c.width = c.height = S; c.getContext('2d').putImageData(img, 0, 0); return c;
+  if (bx1 < bx0) { const c = document.createElement('canvas'); c.width = c.height = 1; return { c, ox: 0, oy: 0 }; }
+  const D = new Uint8ClampedArray(N * N * 4);
+  for (let idx = 0; idx < N * N; idx++) {
+    const ti = Tid[idx]; if (ti < 0) continue; const t = tris[ti], w0 = B0[idx], w1 = B1[idx], w2 = 1 - w0 - w1, m = MATS[t[6]], na = t[3], nb = t[4], nc = t[5];
+    let lx = w0 * na[0] + w1 * nb[0] + w2 * nc[0], ly = w0 * na[1] + w1 * nb[1] + w2 * nc[1], lz = w0 * na[2] + w1 * nb[2] + w2 * nc[2];
+    const mx = w0 * t[0][0] + w1 * t[1][0] + w2 * t[2][0], my = w0 * t[0][1] + w1 * t[1][1] + w2 * t[2][1], mz = w0 * t[0][2] + w1 * t[1][2] + w2 * t[2][2];
+    let r = m.c[0], g = m.c[1], b = m.c[2], mu = 1;
+    if (m.tex) { texEval(m.tex, mx, my, mz); if (_tx.t > 0) { r = lerp(r, m.c2[0], _tx.t); g = lerp(g, m.c2[1], _tx.t); b = lerp(b, m.c2[2], _tx.t); } mu = _tx.mu; }
+    if (m.bump) { const u = (mx + mz) * .7, v = my * .7, gx = vn(u + .4, v) - vn(u - .4, v), gy = vn(u, v + .4) - vn(u, v - .4); lx += gx * m.bump * 2.2; ly += gy * m.bump * 2.2; lz -= gx * m.bump * 1.5; }
+    const nl = Math.hypot(lx, ly, lz) || 1; lx /= nl; ly /= nl; lz /= nl; const nx = lx * cy_ - lz * sy_, ny = ly, nz = lx * sy_ + lz * cy_;
+    const dk = Math.max(0, nx * LK[0] + ny * LK[1] + nz * LK[2]), df = Math.max(0, nx * LF[0] + ny * LF[1] + nz * LF[2]), hemi = ny * .5 + .5, nv = Math.max(0, nx * VV_[0] + ny * VV_[1] + nz * VV_[2]);
+    const rim = Math.pow(1 - nv, 2.6) * (.3 + .7 * Math.max(0, nx * RD_[0] + ny * RD_[1] + nz * RD_[2])) * .5; let sp = 0; if (m.spec) sp = Math.pow(Math.max(0, nx * HV_[0] + ny * HV_[1] + nz * HV_[2]), m.shine) * m.spec * 255;
+    const hy = (.72 + .28 * clamp(my / aoH, 0, 1)) * mu, lr = dk + df * .18 + .3 + .06 * hemi, lg = dk * .93 + df * .22 + .25 + .15 * hemi, lb = dk * .82 + df * .32 + .2 + .3 * hemi;
+    let R = r * lr * hy + sp + rim * 150, G_ = g * lg * hy + sp + rim * 90, B_ = b * lb * hy + sp + rim * 40;
+    if (m.em) { R = lerp(R, m.c[0], m.em); G_ = lerp(G_, m.c[1], m.em); B_ = lerp(B_, m.c[2], m.em); }
+    const o = idx * 4; D[o] = R; D[o + 1] = G_; D[o + 2] = B_; D[o + 3] = 255;
+  }
+  const Rr = Math.max(2, Math.round(3.6 * ss)), taps = [[1, 0], [.7, .7], [0, 1], [-.7, .7], [-1, 0], [-.7, -.7], [0, -1], [.7, -.7]];
+  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) {
+    const idx = y * N + x; if (Tid[idx] < 0) continue; const z0 = Zb[idx]; let occ = 0, edge = 1;
+    for (let i = 0; i < 8; i++) { const xx = x + Math.round(taps[i][0] * Rr), yy = y + Math.round(taps[i][1] * Rr); if (xx < 0 || yy < 0 || xx >= N || yy >= N) continue; const j = yy * N + xx; if (Tid[j] < 0) continue; const dz = Zb[j] - z0; if (dz > 0) occ += dz > 5 ? 1 : dz * .2; }
+    for (let i = 0; i < 4; i++) { const xx = x + (i === 0 ? 1 : i === 1 ? -1 : 0), yy = y + (i === 2 ? 1 : i === 3 ? -1 : 0); if (xx < 0 || yy < 0 || xx >= N || yy >= N || Tid[yy * N + xx] < 0) { edge = .55; break; } if (Zb[yy * N + xx] - z0 > 6) edge = Math.min(edge, .78); }
+    const f = Math.max(.3, 1 - Math.min(.7, occ / 8 * 1.7)) * edge, o = idx * 4; D[o] *= f; D[o + 1] *= f; D[o + 2] *= f;
+  }
+  const hi = document.createElement('canvas'); hi.width = hi.height = N; hi.getContext('2d').putImageData(new ImageData(D, N, N), 0, 0);
+  const fx0 = Math.max(0, Math.floor(bx0 / ss) - 1), fy0 = Math.max(0, Math.floor(by0 / ss) - 1), fx1 = Math.min(S - 1, Math.ceil(bx1 / ss) + 1), fy1 = Math.min(S - 1, Math.ceil(by1 / ss) + 1), w = fx1 - fx0 + 1, h = fy1 - fy0 + 1;
+  const out = document.createElement('canvas'); out.width = w; out.height = h; const oc = out.getContext('2d'); oc.imageSmoothingQuality = 'high'; oc.drawImage(hi, fx0 * ss, fy0 * ss, w * ss, h * ss, 0, 0, w, h); return { c: out, ox: ox - fx0, oy: oy - fy0 };
 }
-function bakeStatic(tris, S, sc, aoH, yaw) { // render + crop
-  const c = rasterTris(tris, yaw || 0, S, S / 2, S * .72, sc, aoH), d = c.getContext('2d').getImageData(0, 0, S, S).data; let x0 = S, x1 = 0, y0 = S, y1 = 0;
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (d[(y * S + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  const o = document.createElement('canvas'); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1; o.getContext('2d').drawImage(c, -x0, -y0); return { c: o, ox: S / 2 - x0, oy: S * .72 - y0 };
-}
+function bakeStatic(tris, S, sc, aoH, yaw) { return rasterTris(tris, yaw || 0, S, S / 2, S * .72, sc, aoH, 2); }
+function flipSpr(sp) { const w = sp.c.width, h = sp.c.height, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.translate(w, 0); x.scale(-1, 1); x.drawImage(sp.c, 0, 0); return { c, ox: w - sp.ox, oy: sp.oy }; }
 function pl(x, y, z, yaw, sc) { const c = Math.cos(yaw), s = Math.sin(yaw), xr = x * c - z * s, zr = x * s + z * c; return [(xr - zr) * IX * sc, (xr + zr) * IY * sc - y * 1.04 * sc]; }
 const flashCache = new WeakMap();
-function flashOf(c) { let f = flashCache.get(c); if (!f) { f = document.createElement('canvas'); f.width = c.width; f.height = c.height; const x = f.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(255,235,215,.85)'; x.fillRect(0, 0, f.width, f.height); flashCache.set(c, f); } return f; }
+function flashOf(c) { let f = flashCache.get(c); if (!f) { f = document.createElement('canvas'); f.width = c.width; f.height = c.height; const x = f.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(255,238,220,.6)'; x.fillRect(0, 0, f.width, f.height); flashCache.set(c, f); } return f; }
 
-/* ---------- models ---------- */
-const GUN_N = 32, GUN_S = 128, MECH_S = 210, MECH_OX = 105, MECH_OY = 170, SH_Z = 30, SH_Y = 62;
-const SKC = { S: 190, ox: 95, oy: 125, sc: 1.7 }, RVC_ = { S: 250, ox: 125, oy: 170, sc: 1.7 };
-const mechBob = f => f === 6 ? 0 : Math.sin(f / 6 * TAU * 2) * 2.2;
+/* ---------- modelling toolkit ---------- */
+const cyl = limb;
 function tiltM(M, ang, cx, cy) { const c = Math.cos(ang), s = Math.sin(ang), rp = p => { const x = p[0] - cx, y = p[1] - cy; return [cx + x * c - y * s, cy + x * s + y * c, p[2]]; }, rn = n => [n[0] * c - n[1] * s, n[0] * s + n[1] * c, n[2]]; return M.map(t => [rp(t[0]), rp(t[1]), rp(t[2]), rn(t[3]), rn(t[4]), rn(t[5]), t[6]]); }
+function xfSub(M, S, o) {
+  const px = o.px || 0, py = o.py || 0, pz = o.pz || 0, cx = Math.cos(o.rx || 0), sx = Math.sin(o.rx || 0), cy = Math.cos(o.ry || 0), sy = Math.sin(o.ry || 0), cz = Math.cos(o.rz || 0), sz = Math.sin(o.rz || 0), tx = o.tx || 0, ty = o.ty || 0, tz = o.tz || 0;
+  const R = (x, y, z) => { const x1 = x * cz - y * sz, y1 = x * sz + y * cz, y2 = y1 * cx - z * sx, z2 = y1 * sx + z * cx; return [x1 * cy - z2 * sy, y2, x1 * sy + z2 * cy]; };
+  for (const t of S) { const o2 = []; for (let i = 0; i < 3; i++) { const q = R(t[i][0] - px, t[i][1] - py, t[i][2] - pz); o2[i] = [q[0] + px + tx, q[1] + py + ty, q[2] + pz + tz]; o2[3 + i] = R(t[3 + i][0], t[3 + i][1], t[3 + i][2]); } o2[6] = t[6]; M.push(o2); }
+}
+function sub(M, o, fn) { const S = []; fn(S); xfSub(M, S, o); }
+function scaleMesh(M, kx, ky, kz) { return M.map(t => [[t[0][0] * kx, t[0][1] * ky, t[0][2] * kz], [t[1][0] * kx, t[1][1] * ky, t[1][2] * kz], [t[2][0] * kx, t[2][1] * ky, t[2][2] * kz], t[3], t[4], t[5], t[6]]); }
+function loft(M, L, mat) {
+  const ring = l => { const hw = Math.max(.01, l.hw), hd = Math.max(.01, l.hd), e = Math.min(l.e || 0, hw * .9, hd * .9), cx = l.x || 0, cz = l.z || 0, y = l.y; return [[cx - hw + e, y, cz - hd], [cx + hw - e, y, cz - hd], [cx + hw, y, cz - hd + e], [cx + hw, y, cz + hd - e], [cx + hw - e, y, cz + hd], [cx - hw + e, y, cz + hd], [cx - hw, y, cz + hd - e], [cx - hw, y, cz - hd + e]]; };
+  const R = L.map(ring), ctr = [L.reduce((a, l) => a + (l.x || 0), 0) / L.length, (L[0].y + L[L.length - 1].y) / 2, L.reduce((a, l) => a + (l.z || 0), 0) / L.length];
+  for (let k = 0; k < R.length - 1; k++) for (let i = 0; i < 8; i++) { const j = (i + 1) % 8; pushQuad(M, R[k][i], R[k][j], R[k + 1][j], R[k + 1][i], mat, ctr); }
+  for (const [ring_, ny] of [[R[0], -1], [R[R.length - 1], 1]]) { const c = [ctr[0] + (ring_ === R[0] ? (L[0].x || 0) - ctr[0] : (L[L.length - 1].x || 0) - ctr[0]), ring_[0][1], ctr[2] + (ring_ === R[0] ? (L[0].z || 0) - ctr[2] : (L[L.length - 1].z || 0) - ctr[2])], n = [0, ny, 0]; for (let i = 0; i < 8; i++) M.push([c, ring_[i], ring_[(i + 1) % 8], n, n, n, mat]); }
+}
+function slab(M, x, y, z, hw, hd, h, c, mat, top) { top = top || [hw, hd]; c = Math.min(c, hw * .45, hd * .45, h * .4); loft(M, [{ y, hw: hw - c * .6, hd: hd - c * .6, e: c * .5, x, z }, { y: y + c, hw, hd, e: c, x, z }, { y: y + h - c, hw: top[0], hd: top[1], e: c, x, z }, { y: y + h, hw: top[0] - c * .6, hd: top[1] - c * .6, e: c * .5, x, z }], mat); }
+function surf(M, f, nu, nv, mat, ctr) {
+  const Gd = []; for (let j = 0; j <= nv; j++) { const row = []; for (let i = 0; i < nu; i++) row.push(f(i / nu, j / nv)); Gd.push(row); }
+  const nrm = (i, j) => { const u = i / nu, v = j / nv, e = 1e-3, du = V3.sub(f((u + e) % 1, v), f((u - e + 1) % 1, v)), dv = V3.sub(f(u, Math.min(1, v + e)), f(u, Math.max(0, v - e))); let n = V3.cross(du, dv); const out = V3.sub(Gd[j][i], ctr); if (Math.hypot(n[0], n[1], n[2]) < 1e-8) n = out; n = V3.norm(n); return V3.dot(n, out) < 0 ? [-n[0], -n[1], -n[2]] : n; };
+  const N = []; for (let j = 0; j <= nv; j++) { const row = []; for (let i = 0; i < nu; i++) row.push(nrm(i, j)); N.push(row); }
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const i2 = (i + 1) % nu; M.push([Gd[j][i], Gd[j][i2], Gd[j + 1][i2], N[j][i], N[j][i2], N[j + 1][i2], mat], [Gd[j][i], Gd[j + 1][i2], Gd[j + 1][i], N[j][i], N[j + 1][i2], N[j + 1][i], mat]); }
+}
+function body(M, cx, cy, cz, rx, ry, rz, mat, o) { o = o || {}; const n = o.bands || 0, amp = o.amp || 0; surf(M, (u, v) => { const th = v * Math.PI, a = u * TAU, rad = Math.sin(th) * (1 + amp * Math.pow(Math.sin(v * n * Math.PI), 2)); return [cx + rx * Math.cos(th), cy + ry * rad * Math.cos(a), cz + rz * rad * Math.sin(a)]; }, o.seg || 12, o.rings || 9, mat, [cx, cy, cz]); }
+function blade(M, pts, wfn, th, up, mat) {
+  const n = pts.length, rings = []; for (let i = 0; i < n; i++) { const t0 = pts[Math.max(0, i - 1)], t1 = pts[Math.min(n - 1, i + 1)], tg = V3.norm(V3.sub(t1, t0)); let wd = V3.sub(up, V3.mul(tg, V3.dot(up, tg))); wd = V3.norm(wd); const nd = V3.norm(V3.cross(tg, wd)), w = wfn(i / (n - 1)), P = pts[i];
+    rings.push([V3.add(P, V3.mul(wd, w)), V3.add(P, V3.mul(nd, th * (w > .3 ? 1 : .4))), V3.add(P, V3.mul(wd, -w * .35)), V3.add(P, V3.mul(nd, -th * (w > .3 ? 1 : .4)))]); }
+  for (let i = 0; i < n - 1; i++) { const ctr = V3.mul(V3.add(pts[i], pts[i + 1]), .5); for (let k = 0; k < 4; k++) { const k2 = (k + 1) % 4; pushQuad(M, rings[i][k], rings[i][k2], rings[i + 1][k2], rings[i + 1][k], mat, ctr); } }
+}
+function bez(a, c, b, n) { const out = []; for (let i = 0; i < n; i++) { const t = i / (n - 1), u = 1 - t; out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1], u * u * a[2] + 2 * u * t * c[2] + t * t * b[2]]); } return out; }
+function ik2(hip, foot, l1, l2, bend) { const d = V3.sub(foot, hip); let dist = Math.hypot(d[0], d[1], d[2]) || 1; const dir = V3.mul(d, 1 / dist); dist = Math.min(dist, l1 + l2 - .02); const a = (l1 * l1 - l2 * l2 + dist * dist) / (2 * dist), h = Math.sqrt(Math.max(0, l1 * l1 - a * a)); let bb = V3.sub(bend, V3.mul(dir, V3.dot(bend, dir))); bb = V3.norm(bb); return V3.add(V3.add(hip, V3.mul(dir, a)), V3.mul(bb, h)); }
+function gait(ph, stride, lift) { const lp = ((ph % 1) + 1) % 1; if (lp < .5) return [stride - 2 * stride * (lp / .5), 0]; const u = (lp - .5) / .5, e = u * u * (3 - 2 * u); return [-stride + 2 * stride * e, Math.sin(u * Math.PI) * lift]; }
+
+/* ---------- the rig (scrap walker) ---------- */
+const GUN_N = 32, GUN_S = 150, MECH_S = 240, MECH_OX = 120, MECH_OY = 185, SH_Z = 30, SH_Y = 62, MAC_S = 300;
+const mechBob = f => f === 8 ? 0 : -Math.cos(f / 8 * TAU * 2) * 1.9;
 function mechBody(f) {
-  const M = [], idle = f === 6, ph = idle ? 0 : f / 6 * TAU, bob = mechBob(f);
+  const M = [], idle = f === 8, ph = idle ? 0 : f / 8, bob = mechBob(f), hipY = 40 + bob, tw = idle ? 0 : Math.sin(ph * TAU) * .07, rl = idle ? 0 : Math.sin(ph * TAU) * .04, ln = idle ? 0 : -.05;
   for (const s of [-1, 1]) {
-    const q = ph + (s > 0 ? Math.PI : 0), sw = idle ? 0 : Math.sin(q), lift = idle ? 0 : Math.max(0, Math.cos(q)) * 10, hip = [0, 44 + bob, s * 13], foot = [4 + 14 * sw, 4 + lift, s * 15];
-    const mid = [(hip[0] + foot[0]) / 2 + 11, (hip[1] + foot[1]) / 2 + 4, (hip[2] + foot[2]) / 2 + s * 3];
-    limb(M, hip, mid, 7.5, 6, M_RUSTD, 8); limb(M, mid, [foot[0], foot[1] + 4, foot[2]], 5.5, 4.2, M_GREYP, 8); limb(M, [hip[0] + 4, hip[1] - 3, hip[2] + s * 6], [mid[0] + 2, mid[1] + 3, mid[2] + s * 6], 1.8, 1.8, M_STEEL, 5);
-    ellip(M, mid[0], mid[1], mid[2], 7, 6.5, 7, M_PIPE, 8, 5); frustum(M, foot[0] + 4, foot[1] - 4, foot[2], 12, 8, 9, 6.5, 6, M_RUSTD); frustum(M, foot[0] + 14, foot[1] - 4, foot[2], 2.5, 7, 2.5, 6, 4, M_PIPE);
+    const [fx, lift] = idle ? [0, 0] : gait(ph + (s > 0 ? .5 : 0), 14, 11), hip = [0, hipY, s * 15], foot = [fx + 3, 7 + lift, s * 17], knee = ik2(hip, foot, 25, 25, [1, .25, 0]);
+    cyl(M, hip, knee, 9, 7.5, M_RPD, 10); ellip(M, hip[0], hip[1], hip[2], 10, 10, 10, M_MET, 10, 7); slab(M, knee[0] + 3, knee[1] - 7, knee[2], 8, 8.5, 14, 2.5, M_RPT); cyl(M, knee, foot, 6.8, 5.5, M_GRY, 9); ellip(M, knee[0], knee[1], knee[2], 6.2, 6.2, 6.2, M_MET, 8, 6);
+    const pm = V3.add(V3.mul(V3.add(knee, foot), .5), [-5, 3, s * 5]); cyl(M, [hip[0] + 7, hip[1] - 5, hip[2] + s * 8], pm, 2.3, 2.3, M_MET, 6); cyl(M, pm, V3.add(pm, V3.mul(V3.norm(V3.sub(pm, [hip[0] + 7, hip[1] - 5, hip[2] + s * 8])), 9)), 1.5, 1.5, M_GRY, 5);
+    ellip(M, foot[0], foot[1] + 1, foot[2], 6, 6, 6, M_MET, 8, 5); slab(M, foot[0] + 5, foot[1] - 7, foot[2], 12, 8.5, 8, 3, M_RPD); slab(M, foot[0] + 16, foot[1] - 7.5, foot[2], 3.4, 7.4, 5.5, 1.5, M_MET); slab(M, foot[0] - 9, foot[1] - 7, foot[2], 3.4, 7, 7, 1.5, M_MET);
   }
-  frustum(M, 0, 38 + bob, 0, 12, 16, 11, 15, 9, M_RUSTD); frustum(M, 0, 46 + bob, 0, 17, 19, 14, 17, 22, M_RUSTP);
-  frustum(M, 15, 49 + bob, 4, 2, 11, 1.6, 10, 12, M_OLIVE); frustum(M, 3, 46 + bob, 18.5, 11, 1.6, 9, 1.4, 14, M_GREYP); frustum(M, 3, 46 + bob, -18.5, 10, 1.6, 8, 1.4, 12, M_OLIVE);
-  frustum(M, 4, 66 + bob, 0, 5, 6, 4, 5, 8, M_OVER); ellip(M, 4, 77 + bob, 0, 3.6, 4, 3.6, M_SKIN, 7, 5); ellip(M, 4, 79.6 + bob, 0, 4.2, 2.4, 4.2, M_CAP, 7, 4); frustum(M, 7.2, 76 + bob, 0, .8, 1.2, .8, 1.2, 2, M_GLASS);
-  for (const z of [-11, 11]) { limb(M, [12, 68 + bob, z], [10, 90 + bob, z * .85], 1, 1, M_PIPE, 4); limb(M, [-7, 68 + bob, z], [-5, 90 + bob, z * .85], 1, 1, M_PIPE, 4); limb(M, [10, 90 + bob, z * .85], [-5, 90 + bob, z * .85], 1, 1, M_PIPE, 4); }
-  limb(M, [10, 90 + bob, -9.5], [10, 90 + bob, 9.5], 1, 1, M_PIPE, 4); limb(M, [-5, 90 + bob, -9.5], [-5, 90 + bob, 9.5], 1, 1, M_PIPE, 4); frustum(M, 2.5, 90 + bob, 0, 10, 11, 9, 10, 2, M_GREYP);
-  limb(M, [5, 94 + bob, 0], [15, 94 + bob, 0], 4.8, 4.8, M_PIPE, 8); limb(M, [15, 94 + bob, 0], [16.4, 94 + bob, 0], 4.2, 4.2, M_LAMP, 8); limb(M, [3, 91 + bob, 0], [6, 94 + bob, 0], 1.6, 1.6, M_STEEL, 4);
-  for (const z of [-9, 9]) { limb(M, [-16, 52 + bob, z], [-16, 98 + bob, z], 2.8, 2.6, M_PIPE, 7); limb(M, [-16, 98 + bob, z], [-16, 100 + bob, z], 3.5, 3.5, M_BURN, 7); }
-  limb(M, [-23, 46 + bob, 0], [-23, 68 + bob, 0], 7.5, 7.5, M_RUSTD, 9); limb(M, [-23, 56 + bob, 0], [-23, 58 + bob, 0], 7.9, 7.9, M_PIPE, 9); limb(M, [-29, 60 + bob, 0], [-25, 60 + bob, 0], 12, 12, M_TIRE, 10); limb(M, [-29.4, 60 + bob, 0], [-28, 60 + bob, 0], 4, 4, M_STEEL, 6);
-  for (const s of [-1, 1]) { frustum(M, -1, 62 + bob, s * 23, 10, 7, 8.5, 6, 10, M_OLIVE); limb(M, [0, 60 + bob, s * 16], [0, SH_Y + bob, s * SH_Z], 4.5, 4.5, M_GREYP, 7); ellip(M, 0, SH_Y + bob, s * SH_Z, 7, 7, 7, M_PIPE, 7, 5); }
+  slab(M, 0, hipY - 6, 0, 13, 22, 11, 3, M_RPD);
+  sub(M, { ry: tw, rx: rl, rz: ln, px: 0, py: hipY + 6, pz: 0 }, S => {
+    const y0 = hipY + 6;
+    slab(S, 0, y0, 0, 20, 23, 22, 4, M_RPT, [17, 21]); slab(S, 17, y0 + 3, 0, 4, 19, 16, 2, M_OLV); slab(S, 21.2, y0 + 5, 0, 1, 20, 3.4, .6, M_HAZ);
+    for (const z of [-1, 1]) { slab(S, 1, y0 + 4, z * 23.8, 13, 2, 14, 1, z < 0 ? M_GRY : M_OLV); slab(S, -9, y0 + 12, z * 24.2, 7, 1.6, 7, .8, M_RPD); }
+    slab(S, -19, y0 + 2, 0, 9, 19, 20, 3, M_RPD, [8, 18]); for (let i = 0; i < 5; i++) slab(S, -28.4, y0 + 5 + i * 3, 0, .8, 15, 1.2, .3, M_MET);
+    cyl(S, [-33, y0 + 14, 0], [-27, y0 + 14, 0], 13, 13, M_TRD, 14); cyl(S, [-33.6, y0 + 14, 0], [-31, y0 + 14, 0], 5, 5, M_MET, 10);
+    for (const z of [-10, 10]) { cyl(S, [-19, y0 + 20, z], [-19, y0 + 58, z], 3.2, 2.8, M_MET, 8); cyl(S, [-19, y0 + 58, z], [-19, y0 + 60.5, z], 4, 4, M_BURN, 8); }
+    slab(S, -3, y0 + 22, 0, 8, 9, 3, .8, M_RPD); slab(S, 1, y0 + 25, 0, 5, 7, 9, 2, M_OVER); ellip(S, 1.5, y0 + 38, 0, 4.2, 4.6, 4.2, M_SKIN, 9, 6); ellip(S, 1.5, y0 + 41.2, 0, 5, 3, 5, M_CAP, 9, 5); slab(S, 5.5, y0 + 39.4, 0, 1.4, 4.4, 1.4, .4, M_CAP);
+    for (const z of [-1, 1]) { slab(S, 6, y0 + 36.6, z * 2.2, .7, 1.5, 1.8, .3, M_GLASS); cyl(S, [1, y0 + 31, z * 5], [9, y0 + 27.5, z * 3.2], 1.8, 1.6, M_OVER, 5); }
+    for (const z of [-1, 1]) { cyl(S, [12, y0 + 22, z * 15], [10, y0 + 44, z * 12], 1.4, 1.4, M_MET, 6); cyl(S, [-7, y0 + 22, z * 15], [-5, y0 + 44, z * 12], 1.4, 1.4, M_MET, 6); cyl(S, [10, y0 + 44, z * 12], [-5, y0 + 44, z * 12], 1.3, 1.3, M_MET, 6); cyl(S, [12, y0 + 22, z * 15], [-5, y0 + 44, z * 12], 1, 1, M_MET, 5); }
+    cyl(S, [10, y0 + 44, -12], [10, y0 + 44, 12], 1.3, 1.3, M_MET, 6); cyl(S, [-5, y0 + 44, -12], [-5, y0 + 44, 12], 1.3, 1.3, M_MET, 6); slab(S, 2.5, y0 + 44, 0, 11, 13, 2, .6, M_GRY);
+    cyl(S, [6, y0 + 49, 0], [17, y0 + 49, 0], 5.5, 5.5, M_MET, 10); cyl(S, [17, y0 + 49, 0], [18.6, y0 + 49, 0], 4.6, 4.6, M_LAMP, 10); cyl(S, [3, y0 + 46, 0], [6, y0 + 49, 0], 2, 2, M_MET, 5);
+    for (const z of [-1, 1]) { slab(S, -1, y0 + 8, z * 27, 12, 8, 14, 2.5, M_OLV, [10, 7]); ellip(S, 0, y0 + 16, z * 30, 8, 8, 8, M_MET, 9, 6); }
+  });
   return M;
 }
 function gunMesh(s) {
-  const M = [], z = s * 1.5; limb(M, [0, 0, 0], [8, -10, z], 4.6, 4.4, M_RUSTD, 7); ellip(M, 0, 0, 0, 6.5, 6.5, 6.5, M_PIPE, 7, 5); frustum(M, 6, -18, z, 9, 6, 8, 5.5, 14, M_RUSTP);
-  limb(M, [4, -4, z - 5], [4, -4, z + 5], 6.4, 6.4, M_RUSTD, 9); limb(M, [4, -4, z + 5], [4, -4, z + 5.8], 4.6, 4.6, M_STEEL, 9);
-  for (let i = 0; i < 6; i++) { const a = i * TAU / 6, by = -11 + Math.cos(a) * 3.4, bz = z + Math.sin(a) * 3.4; limb(M, [14, by, bz], [50, by, bz], 1.5, 1.4, M_DARK, 5); }
-  limb(M, [12, -11, z], [24, -11, z], 5.6, 5.4, M_GREYP, 8); limb(M, [30, -11, z], [33, -11, z], 5.6, 5.6, M_PIPE, 8); limb(M, [46, -11, z], [49, -11, z], 5.2, 5.2, M_PIPE, 8); return M;
+  const M = [], z = s * 1.5; ellip(M, 0, 0, 0, 8, 8, 8, M_MET, 10, 7); cyl(M, [0, 0, 0], [10, -9, z], 5.5, 5, M_RPD, 8); slab(M, 5, -21, z, 11, 7.5, 16, 3, M_RPT, [10, 7]); slab(M, 0, -17, z + s * 9, 6, 3, 10, 1.2, M_OLV);
+  for (let i = 0; i < 6; i++) { const a = i * TAU / 6, by = -13 + Math.cos(a) * 3.8, bz = z + Math.sin(a) * 3.8; cyl(M, [16, by, bz], [52, by, bz], 1.7, 1.55, M_MET, 6); }
+  cyl(M, [14, -13, z], [22, -13, z], 6.6, 6.4, M_GRY, 10); cyl(M, [26, -13, z], [29, -13, z], 6.6, 6.6, M_RPD, 10); cyl(M, [36, -13, z], [38.5, -13, z], 6.2, 6.2, M_MET, 10); cyl(M, [48, -13, z], [53, -13, z], 6.4, 6.4, M_MET, 10); return M;
 }
-const MAC_S = 300;
 function macMesh(hot) {
-  const M = [], B = hot ? M_HOT : M_STEEL; limb(M, [0, 0, 0], [14, 0, 0], 4.8, 4.2, M_RUSTD, 7); limb(M, [14, 0, 0], [27, 0, 0], 3.2, 3.2, M_TIRE, 7); frustum(M, 27, -9, 0, 1.6, 7, 1.6, 7, 18, M_PIPE);
-  frustum(M, 72, -8, 0, 46, 1.4, 42, 1.2, 16, B); frustum(M, 116, -8, 0, 8, 1.3, 1, .9, 16, B); frustum(M, 72, 7.4, 0, 45, 2.6, 41, 2.4, 1.6, hot ? M_BURN : M_STEELD);
-  if (hot) frustum(M, 70, -1.4, 0, 42, 1.7, 38, 1.7, 2.8, M_EMBER); return M;
+  const M = [], B = hot ? M_HOT : M_MET; cyl(M, [0, 0, 0], [14, 0, 0], 5, 4.4, M_RPD, 8); cyl(M, [14, 0, 0], [27, 0, 0], 3.3, 3.3, M_TRD, 8); slab(M, 27, -9, 0, 1.8, 7.5, 18, .6, M_MET);
+  const path = []; for (let i = 0; i < 12; i++) { const t = i / 11; path.push([28 + t * 92, 0, Math.sin(t * Math.PI) * 1.2 - t * t * 4]); } blade(M, path, t => t < .8 ? 8.5 - t * 1.4 : (1 - t) / .2 * 6.2, 1.5, [0, 1, 0], B);
+  cyl(M, [30, 7, 0], [118, 7.8, 0], 1.2, 1.2, hot ? M_BURN : M_GRY, 5); if (hot) cyl(M, [32, 0, 0], [112, 0, 0], 1.3, 1.3, M_EMBER, 5); return M;
 }
-const SK_ATK = [{ tilt: .36, up: .9, fw: 0 }, { tilt: -.24, up: 0, fw: 1 }, { tilt: .06, up: .2, fw: .35 }];
-function skitterModel(f, atk) {
-  const M = [], ph = atk ? 0 : f / 6 * TAU, up = atk ? atk.up : 0, fw = atk ? atk.fw : 0;
-  ellip(M, 0, 10, 0, 14, 7.5, 8, M_SK, 9, 6); ellip(M, -2, 7, 0, 12, 5, 7, M_SKD, 8, 4); for (let i = 0; i < 5; i++) { const x = -8 + i * 4.5; limb(M, [x, 16, 0], [x - 3, 24 - i * 1.2, 0], 2, .3, M_SKR, 5); }
-  ellip(M, 16, 10, 0, 7.5, 6, 6, M_SKD, 8, 5); limb(M, [14, 15, 0], [20, 19, 0], 2.2, .3, M_SKR, 5);
+
+/* ---------- bugs: built as separable parts so limbs can be ripped off ---------- */
+const SKC = { S: 200, ox: 100, oy: 140, sc: 1.6, cx: 22, cz: 10 }, RVC_ = { S: 290, ox: 145, oy: 205, sc: 1.45, cx: 36, cz: 20 };
+const SK_EYE = [[25, 17.5, -4.4], [25, 17.5, 4.4]], RV_SAC = [[-6, 49, -8], [-14, 47, 8]], RV_MOUTH = [43, 24, 0];
+const SK_POSE = [{ pitch: .38, up: 1, fw: 0, jaw: .9, str: -.04, tailUp: 1 }, { pitch: -.22, up: 0, fw: 1, jaw: 1.1, str: .12 }, { pitch: .05, up: .25, fw: .4, jaw: .4 }];
+const RV_POSE = [{ pitch: .2, up: 1, fw: 0 }, { pitch: -.15, up: 0, fw: 1 }, { pitch: .04, up: .3, fw: .4 }, { pitch: .5, up: 0, fw: 0, spit: 1 }];
+function finishParts(parts, pitch, hy, str) { for (const k in parts) { let m = parts[k]; if (str) m = scaleMesh(m, 1 + str, 1, 1); if (pitch) m = tiltM(m, pitch, 0, hy); parts[k] = m; } return parts; }
+function skitterParts(f, P) {
+  const walk = !P; P = P || {}; const ph = walk ? f / 8 : 0, aUp = P.up || 0, aFw = P.fw || 0, jaw = P.jaw == null ? .22 : P.jaw, bob = walk ? -Math.cos(ph * TAU * 2) * 1.3 : 0, spine = walk ? Math.sin(ph * TAU) * .1 : 0, hy = 13 + bob, B = [], SL = [], SR = [], TL = [];
+  body(B, 6, hy + 1, 0, 13, 9, 10, M_CH, { bands: 3, amp: .05 }); body(B, 5, hy - 3.5, 0, 11, 5, 8, M_CHD); sub(B, { ry: -spine * 1.4, px: -3, py: hy, pz: 0 }, S => body(S, -13, hy - 1, 0, 16, 8.5, 9, M_CH, { bands: 4, amp: .05 }));
+  for (let i = 0; i < 5; i++) { const x = 12 - i * 6.5; blade(B, [[x, hy + 8.5 - i * .5, 0], [x - 2, hy + 12.5 - i * .6, 0], [x - 5, hy + 15 - i, 0]], t => 2.4 * (1 - t) + .15, 1.1, [0, 0, 1], M_SKR); }
+  const hx = 21, T0 = [-27, hy - .5, 0]; let yaw = spine * 1.6 + (walk ? Math.sin((ph - .22) * TAU) * .5 : 0), pit = .12, prev = T0;
+  for (let i = 0; i < 6; i++) { const Ls = 4.7; yaw += walk ? Math.sin((ph - .22 - i * .06) * TAU) * .13 : 0; pit += .06 + (P.tailUp || 0) * .05; const nx = prev[0] - Math.cos(yaw) * Math.cos(pit) * Ls, ny = prev[1] + Math.sin(pit) * Ls, nz = prev[2] + Math.sin(yaw) * Math.cos(pit) * Ls; if (i < 5) { cyl(TL, prev, [nx, ny, nz], 3.6 - i * .55, 3.1 - i * .55, M_CH, 7); ellip(TL, nx, ny, nz, 3.2 - i * .55, 3.2 - i * .55, 3.2 - i * .55, M_CHD, 6, 4); } else blade(TL, [prev, [(prev[0] + nx) / 2, (prev[1] + ny) / 2, (prev[2] + nz) / 2], [nx - 3, ny + 3, nz]], t => 1.9 * (1 - t) + .1, 1.1, [0, 0, 1], M_SKR); prev = [nx, ny, nz]; }
+  body(B, hx, hy + 1.5, 0, 8.5, 6.5, 6.8, M_CHP); loft(B, [{ y: hy - 1, hw: 6, hd: 5, e: 1.5, x: hx + 6 }, { y: hy + 2.8, hw: 9, hd: 5.6, e: 1.5, x: hx + 7 }], M_CHP);
+  sub(B, { rz: -jaw * .9, px: hx + 2, py: hy - 1, pz: 0 }, S => slab(S, hx + 8, hy - 4, 0, 8, 4.2, 3.2, 1, M_CHD)); for (let i = 0; i < 4; i++) for (const z of [-1, 1]) { cyl(B, [hx + 4 + i * 2.6, hy - .6, z * 3.4], [hx + 4.4 + i * 2.6, hy - 3.8, z * 3.4], .9, .1, M_BN, 4); cyl(B, [hx + 4 + i * 2.6, hy - 3.8, z * 3.4], [hx + 4.4 + i * 2.6, hy - .2 - jaw * 1.4, z * 3.4], .1, .8, M_BN, 4); }
+  for (const z of [-1, 1]) { blade(B, bez([hx + 9, hy, z * 4], [hx + 15, hy - 1, z * 8], [hx + 15, hy + 3, z * 3], 5), t => 1.8 * (1 - t) + .15, 1, [0, 1, 0], M_BN); ellip(B, hx + 4, hy + 4.5, z * 4.4, 1.7, 1.7, 1.7, M_EYE, 6, 4); ellip(B, hx + 1, hy + 5.6, z * 2.8, 1, 1, 1, M_EYE, 5, 3); }
+  for (let i = 0; i < 3; i++) blade(B, [[hx - 4 + i * 3, hy + 7.5, 0], [hx - 6 + i * 3, hy + 11, 0], [hx - 9 + i * 3, hy + 14, 0]], t => 1.7 * (1 - t) + .15, 1, [0, 0, 1], M_SKR);
   for (const s of [-1, 1]) {
-    limb(M, [21, 8, s * 2.5], [28, 5, s * 5.5], 1.6, .3, M_BONE, 4); ellip(M, 20, 12, s * 3.4, 1.5, 1.5, 1.5, M_EYE, 5, 4);
-    const sw = atk ? 0 : Math.sin(ph + (s > 0 ? Math.PI : 0)) * 2.5, sh = [9, 13, s * 6], e = [16 + fw * 6, 21 + up * 14 - fw * 2, s * 10], m = [27 + fw * 10, 15 + up * 18 - fw * 9 + sw, s * 8.5], t = [32 + fw * 14, Math.max(1, 3 + up * 24 - fw * 4 + sw), s * 6.5];
-    limb(M, sh, e, 3.2, 2.4, M_SK, 6); limb(M, e, m, 2.8, 1.8, M_BONE, 6); limb(M, m, t, 1.8, .3, M_BONE, 6);
-    for (let i = 0; i < 2; i++) { const q = ph + i * 2.1 + (s > 0 ? Math.PI : 0), sw2 = atk ? 0 : Math.sin(q), lift = atk ? 0 : Math.max(0, Math.cos(q)) * 4.5, hip = [-3 - i * 9, 9, s * 6], foot = [-7 - i * 9 + sw2 * 6, lift, s * 14.5], knee = [hip[0] + (foot[0] - hip[0]) * .5 - 2, 18, s * 12.5]; limb(M, hip, knee, 2.4, 1.8, M_SK, 5); limb(M, knee, foot, 1.8, .6, M_SKD, 5); }
+    const arr = s < 0 ? SL : SR, sw = walk ? Math.sin(ph * TAU + (s > 0 ? Math.PI : 0)) * .25 : 0, E = [16 + aFw * 5 + sw * 3, hy + 12 + aUp * 10, s * (13 + aUp * 2)], W = [22 + aFw * 9, hy + 8 + aUp * 12 - aFw * 3 + sw * 2, s * (11 - aFw * 3)];
+    cyl(arr, [10, hy + 6, s * 8.5], E, 3.6, 2.8, M_CHP, 7); ellip(arr, E[0], E[1], E[2], 3.4, 3.4, 3.4, M_CHD, 7, 5); cyl(arr, E, W, 2.8, 2.2, M_CHP, 7);
+    blade(arr, bez(W, [W[0] + 10, W[1] + (aUp ? 6 : 2), s * (13 - aFw * 4)], [W[0] + 14 + aFw * 10, Math.max(2, W[1] - 14 - aFw * 6 + aUp * 16), s * (8 - aFw * 4)], 7), t => 3.8 * Math.pow(1 - t, .8) + .2, 1.2, [0, .7, s * .7], M_BN);
   }
-  limb(M, [-13, 10, 0], [-22, 11 + up * 5, 0], 3.4, 2.2, M_SK, 6); limb(M, [-22, 11 + up * 5, 0], [-30, 19 + up * 10, 0], 2.2, .4, M_SKR, 6);
-  return atk ? tiltM(M, atk.tilt, 0, 8) : M;
+  for (const lx of [5, -10]) for (const s of [-1, 1]) {
+    const sc_ = lx > 0 ? .85 : 1, [fx, lift] = walk ? gait(ph + ((lx > 0) === (s > 0) ? 0 : .5), 10 * sc_, 7) : [0, 0], hip = [lx, hy - 2, s * 7.5], foot = [lx - 2 + fx, 1 + lift, s * 14], knee = ik2(hip, foot, 13, 16, [1, .8, 0]);
+    body(B, lx, hy - 1, s * 8.5, 5.4, 4.8, 4.4, M_CH); cyl(B, hip, knee, 3.6 * sc_, 2.6 * sc_, M_CH, 7); cyl(B, knee, foot, 2.6 * sc_, 1.4, M_CHD, 6); for (let i = -1; i <= 1; i++) cyl(B, foot, [foot[0] + 4, .2, foot[2] + s * i * 2], 1.2, .15, M_BN, 4);
+  }
+  return finishParts({ body: B, scL: SL, scR: SR, tail: TL }, P.pitch, hy, P.str);
 }
-const RV_ATK = [{ tilt: .2, up: 1, fw: 0 }, { tilt: -.15, up: 0, fw: 1 }, { tilt: .04, up: .3, fw: .4 }, { tilt: .5, up: 0, fw: 0, spit: 1 }];
-function ravagerModel(f, atk) {
-  const M = [], ph = atk ? 0 : f / 6 * TAU, up = atk ? atk.up : 0, fw = atk ? atk.fw : 0, sp = atk && atk.spit ? 1 : 0;
-  ellip(M, 0, 24, 0, 25, 14, 16, M_RVC, 10, 7); ellip(M, 0, 19, 0, 22, 8, 13, M_RVD, 9, 4); for (let i = 0; i < 4; i++) ellip(M, -14 + i * 9, 33 - i * .6, 0, 8.5, 4, 12 - i, M_BONE, 7, 4);
-  const sac = 1 + sp * .35; ellip(M, -10, 39, -7, 7.5 * sac, 7.5 * sac, 7.5 * sac, M_ACID, 8, 5); ellip(M, -6, 37, 9, 6.5 * sac, 6.5 * sac, 6.5 * sac, M_ACID, 8, 5);
-  ellip(M, 28, 22, 0, 10.5, 8.5, 9.5, M_RVD, 8, 5); ellip(M, 37, 19, 0, 2.8, 2.2, 3.2, M_ACID, 5, 4);
+function ravagerParts(f, P) {
+  const walk = !P; P = P || {}; const ph = walk ? f / 8 : 0, up = P.up || 0, fw = P.fw || 0, spit = P.spit || 0, bob = walk ? -Math.cos(ph * TAU * 2) * 1.6 : 0, hy = 26 + bob, B = [], AL = [], AR = [], TL = [];
+  body(B, 8, hy + 3, 0, 24, 17, 19, M_RV, { bands: 4, amp: .08 }); body(B, -14, hy - 2, 0, 22, 13, 15, M_RV, { bands: 4, amp: .09 }); body(B, 8, hy - 5, 0, 20, 8, 15, M_RVD2);
+  for (let i = 0; i < 5; i++) ellip(B, 20 - i * 9, hy + 15.5 - i * .9, 0, 8.5, 4.2, 14 - i * 1.6, M_BN, 9, 5);
+  const sacK = 1 + spit * .3; ellip(B, -6, hy + 21, -8, 6.6 * sacK, 6.2 * sacK, 6.6 * sacK, M_ICH, 9, 6); ellip(B, -14, hy + 19, 8, 5.8 * sacK, 5.4 * sacK, 5.8 * sacK, M_ICH, 9, 6); ellip(B, -2, hy + 18, 9, 4.2 * sacK, 4 * sacK, 4.2 * sacK, M_ICH, 8, 5);
+  const hx = 33; body(B, hx, hy - 2, 0, 11, 9, 10, M_RVD2); sub(B, { rz: -(spit ? .9 : walk ? .25 + Math.sin(ph * TAU * 2) * .05 : .5), px: hx + 2, py: hy - 3, pz: 0 }, S => slab(S, hx + 9, hy - 6.5, 0, 9, 7, 3.5, 1, M_RVD2));
+  for (let i = 0; i < 4; i++) for (const z of [-1, 1]) { cyl(B, [hx + 5 + i * 3, hy - 3, z * 4.5], [hx + 5.6 + i * 3, hy - 8, z * 4.5], 1.3, .1, M_BN, 4); } ellip(B, hx + 8, hy - 4, 0, 3, 2.2, 3.4, M_ICH, 6, 4);
+  for (const z of [-1, 1]) { ellip(B, hx + 4, hy + 4.5, z * 5.5, 1.9, 1.9, 1.9, M_EYE, 6, 4); blade(B, bez([hx + 8, hy - 1, z * 5], [hx + 18, hy - 2, z * 10], [hx + 18, hy + 4, z * 5], 5), t => 2.2 * (1 - t) + .2, 1.1, [0, 1, 0], M_BN); }
+  for (let i = 0; i < 6; i++) blade(B, [[18 - i * 8, hy + 16, 0], [15 - i * 8, hy + 23 - i, 0], [11 - i * 8, hy + 28 - i * 1.4, 0]], t => 2.6 * (1 - t) + .2, 1.2, [0, 0, 1], M_BN);
   for (const s of [-1, 1]) {
-    limb(M, [34, 20, s * 4], [45, 17, s * 9], 2.4, .5, M_BONE, 5); limb(M, [34, 19, s * 3], [44, 11, s * 2], 2, .4, M_BONE, 5); ellip(M, 31, 25, s * 4.5, 1.6, 1.6, 1.6, M_EYE, 5, 4);
-    const sw = atk ? 0 : Math.sin(ph + (s > 0 ? Math.PI : 0)) * 3, sh = [17, 24, s * 14], el = [28 + fw * 4, 16 + up * 22 - fw * 4, s * 19], tip = [42 + fw * 12, Math.max(1, 4 + up * 38 - fw * 5 + sw), s * 15];
-    limb(M, sh, el, 5.5, 4.4, M_RVC, 7); limb(M, el, tip, 4.4, .8, M_BONE, 6);
-    for (let i = 0; i < 2; i++) { const q = ph + i * 2.8 + (s > 0 ? Math.PI : 0), sw2 = atk ? 0 : Math.sin(q), lift = atk ? 0 : Math.max(0, Math.cos(q)) * 5, hip = [-6 - i * 15, 15, s * 12], foot = [-8 - i * 15 + sw2 * 6, lift, s * 22]; limb(M, hip, [foot[0] + 2, 27, s * 21], 4.8, 3.8, M_RVC, 6); limb(M, [foot[0] + 2, 27, s * 21], foot, 3.6, 1.5, M_RVD, 6); }
+    const arr = s < 0 ? AL : AR, E = [30 + fw * 6, hy + 14 + up * 20, s * 24], T = [46 + fw * 16, Math.max(2, hy - 22 - fw * 8 + up * 30), s * 18];
+    cyl(arr, [18, hy + 10, s * 15], E, 7.5, 6, M_RV, 8); ellip(arr, E[0], E[1], E[2], 6.5, 6.5, 6.5, M_RVD2, 8, 6); blade(arr, bez(E, [E[0] + 16, E[1] + (up ? 8 : -2), s * 24], T, 8), t => 7.5 * Math.pow(1 - t, .75) + .3, 2.2, [0, .6, s * .8], M_BN);
+    for (const [lx, o] of [[10, 0], [-14, 1]]) { const [fx, lift] = walk ? gait(ph + (o ? .5 : 0) + (s > 0 ? .5 : 0), 8, 6) : [0, 0], hip = [lx, hy - 6, s * 15], foot = [lx - 2 + fx, 2 + lift, s * 25], knee = ik2(hip, foot, 20, 22, [.6, .5, s * .5]); cyl(B, hip, knee, 6.4, 5, M_RV, 8); ellip(B, knee[0], knee[1], knee[2], 5.2, 5.2, 5.2, M_RVD2, 7, 5); cyl(B, knee, foot, 4.8, 3.2, M_RVD2, 8); slab(B, foot[0] + 3, foot[1] - 2, foot[2], 8, 6, 4, 1.5, M_RVD2); }
   }
-  limb(M, [-23, 19, 0], [-37, 17 + up * 4, 0], 6.5, 2, M_RVC, 6);
-  return atk ? tiltM(M, atk.tilt, 0, 14) : M;
+  let prev = [-34, hy - 2, 0]; for (let i = 0; i < 4; i++) { const nx = prev[0] - 7, ny = prev[1] + 1.2 + i * .8; cyl(TL, prev, [nx, ny, 0], 6 - i * 1.2, 5 - i * 1.2, M_RV, 8); prev = [nx, ny, 0]; } blade(TL, [prev, [prev[0] - 6, prev[1] + 3, 0], [prev[0] - 12, prev[1] + 8, 0]], t => 3 * (1 - t) + .2, 1.6, [0, 0, 1], M_BN);
+  return finishParts({ body: B, scL: AL, scR: AR, tail: TL }, P.pitch, hy, 0);
 }
-function scrapModel() { const M = []; for (let i = 0; i < 3; i++) limb(M, [-6 + (i % 2) * 3, i * 6.5, 2], [-6 + (i % 2) * 3, i * 6.5 + 6, 2], 11.5, 11.5, M_TIRE, 10); limb(M, [14, 0, -5], [14, 19, -5], 7.5, 7.5, M_RUSTD, 9); limb(M, [14, 19, -5], [14, 20, -5], 7.7, 7.7, M_PIPE, 9); frustum(M, -14, 0, -12, 12, 2.5, 12, 2.5, 3, M_CRATE, .4); frustum(M, 2, 0, 16, 9, 7, 9, 7, 8, M_OLIVE, .2); return M; }
-function tankModel() { const M = []; limb(M, [0, 0, 0], [0, 42, 0], 15, 15, M_RUSTD, 12); limb(M, [0, 17, 0], [0, 23, 0], 15.4, 15.4, M_GREYP, 12); ellip(M, 0, 42, 0, 15, 5, 15, M_RUSTP, 12, 4); limb(M, [0, 46, 0], [0, 52, 0], 2.5, 2.5, M_DARK, 6); limb(M, [15, 8, 0], [21, 8, 0], 2, 2, M_DARK, 6); return M; }
-function poleModel() { const M = []; frustum(M, 0, 0, 0, 5, 5, 3.5, 3.5, 6, M_PIPE); limb(M, [0, 6, 0], [0, 112, 0], 2.4, 1.6, M_GREYP, 6); limb(M, [0, 108, 0], [9, 112, 0], 1.5, 1.5, M_GREYP, 5); frustum(M, 11, 108, 0, 7, 4.5, 6, 4, 5, M_DARK); frustum(M, 11, 107, 0, 6, 4, 5.5, 3.5, 1.4, M_WIN); return M; }
-function wreckModel() { const M = []; frustum(M, 0, 5, 0, 27, 13, 25, 12, 9, M_BURN); frustum(M, -3, 14, 0, 14, 11, 11, 9, 10, M_BURN); for (const [x, z] of [[-17, -13], [17, -13], [-17, 13], [17, 13]]) limb(M, [x, 6.5, z - 3], [x, 6.5, z + 3], 6.8, 6.8, M_TIRE, 9);
-  frustum(M, 12, 14, 0, 5, 10, 4, 9, 1.4, M_RUST); for (let i = 0; i < 5; i++) ellip(M, -9 + i * 5, 15.5, -5 + (i % 3) * 5, 2.4, 1.2, 2.4, M_EMBER, 5, 3); for (let i = 0; i < 3; i++) limb(M, [-14 + i * 9, 14, 8 - i * 6], [-13 + i * 8, 24 + (i % 2) * 6, 9 - i * 6], 1.3, .6, M_RUST, 4); return M; }
-function crystalModel() { const M = []; for (const [x, z, h, tx, tz, r] of [[0, 0, 36, 3, 2, 6], [-9, 6, 24, -5, 3, 4.5], [8, -6, 28, 4, -4, 5], [-4, -9, 18, -2, -5, 3.6], [11, 7, 16, 5, 4, 3.4]]) limb(M, [x, 0, z], [x + tx, h, z + tz], r, .3, M_CRYS, 5); ellip(M, 0, 1, 0, 15, 3, 13, M_BURN, 8, 3); return M; }
-function tumorModel() { const M = []; ellip(M, 0, 2, 0, 22, 5, 20, M_FLESH, 10, 4); ellip(M, 0, 15, 0, 11, 15, 11, M_FLESH, 9, 6); ellip(M, -3, 20, 3, 4, 6, 4, M_GLOW, 6, 4); for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + .5; limb(M, [Math.cos(a) * 8, 3, Math.sin(a) * 8], [Math.cos(a) * 26, 1, Math.sin(a) * 26], 2.6, .6, M_FLESH, 5); } return M; }
+function chunkMesh(kind) { const M = []; const m = kind === 0 ? M_CH : kind === 1 ? M_FLESH : M_BN; body(M, 0, 0, 0, 5, 3.6, 4, m, { bands: 2, amp: .15 }); ellip(M, 3, 1, 2, 2.6, 2, 2.4, kind === 1 ? M_GLOW : M_CHD, 6, 4); return M; }
+
+/* ---------- props ---------- */
+function scrapModel() { const M = []; for (let i = 0; i < 3; i++) cyl(M, [-6 + (i % 2) * 3, i * 6.5, 2], [-6 + (i % 2) * 3, i * 6.5 + 6, 2], 11.5, 11.5, M_TRD, 12); cyl(M, [14, 0, -5], [14, 19, -5], 7.5, 7.5, M_RPD, 10); cyl(M, [14, 19, -5], [14, 20, -5], 7.7, 7.7, M_MET, 10); slab(M, -14, 0, -12, 12, 7, 3, 1, M_RPD); slab(M, 2, 0, 16, 9, 8, 8, 2, M_OLV); return M; }
+function tankModel() { const M = []; cyl(M, [0, 0, 0], [0, 42, 0], 15, 15, M_RPD, 14); cyl(M, [0, 17, 0], [0, 23, 0], 15.4, 15.4, M_GRY, 14); ellip(M, 0, 42, 0, 15, 5, 15, M_RPT, 12, 4); cyl(M, [0, 46, 0], [0, 52, 0], 2.5, 2.5, M_MET, 6); cyl(M, [15, 8, 0], [21, 8, 0], 2, 2, M_MET, 6); return M; }
+function poleModel() { const M = []; slab(M, 0, 0, 0, 5, 5, 6, 1.5, M_MET); cyl(M, [0, 6, 0], [0, 112, 0], 2.4, 1.6, M_GRY, 7); cyl(M, [0, 108, 0], [9, 112, 0], 1.5, 1.5, M_GRY, 5); slab(M, 11, 108, 0, 7, 4.5, 5, 1, M_MET); slab(M, 11, 107, 0, 6, 4, 1.4, .3, M_WIN); return M; }
+function wreckModel() { const M = []; slab(M, 0, 5, 0, 27, 14, 9, 3, M_BURN); slab(M, -3, 14, 0, 14, 11, 10, 2.5, M_BURN, [11, 9]); for (const [x, z] of [[-17, -13], [17, -13], [-17, 13], [17, 13]]) cyl(M, [x, 6.5, z - 3], [x, 6.5, z + 3], 6.8, 6.8, M_TRD, 10);
+  slab(M, 12, 14, 0, 6, 10, 1.4, .4, M_RPD); for (let i = 0; i < 5; i++) ellip(M, -9 + i * 5, 15.5, -5 + (i % 3) * 5, 2.4, 1.2, 2.4, M_EMBER, 5, 3); for (let i = 0; i < 3; i++) cyl(M, [-14 + i * 9, 14, 8 - i * 6], [-13 + i * 8, 24 + (i % 2) * 6, 9 - i * 6], 1.3, .6, M_RPD, 4); return M; }
+function crystalModel() { const M = []; for (const [x, z, h, tx, tz, r] of [[0, 0, 36, 3, 2, 6], [-9, 6, 24, -5, 3, 4.5], [8, -6, 28, 4, -4, 5], [-4, -9, 18, -2, -5, 3.6], [11, 7, 16, 5, 4, 3.4]]) cyl(M, [x, 0, z], [x + tx, h, z + tz], r, .3, M_CRYS, 6); ellip(M, 0, 1, 0, 15, 3, 13, M_BURN, 8, 3); return M; }
+function tumorModel() { const M = []; ellip(M, 0, 2, 0, 22, 5, 20, M_FLESH, 12, 5); ellip(M, 0, 15, 0, 11, 15, 11, M_FLESH, 12, 8); ellip(M, -3, 20, 3, 4, 6, 4, M_GLOW, 8, 5); for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + .5; cyl(M, [Math.cos(a) * 8, 3, Math.sin(a) * 8], [Math.cos(a) * 26, 1, Math.sin(a) * 26], 2.6, .6, M_FLESH, 6); } return M; }
 function habModel() {
-  const M = [], w = 66, d = 46, h = 56; frustum(M, 0, 0, 0, w, d, w, d, h, M_CON); frustum(M, 0, h, 0, w + 4, d + 4, w + 4, d + 4, 5, M_RUSTD); frustum(M, w + 7, 32, 0, 7, d + 2, 1, d + 2, 7, M_RUSTP);
-  for (const z of [-30, -6, 18]) frustum(M, w + .6, 14, z + 5, .6, 8, .6, 8, 14, M_WIN); for (const x of [-42, -14, 14, 42]) frustum(M, x, 22, d + .6, 8, .6, 8, .6, 16, M_WIN);
-  frustum(M, w + .6, 0, 0, .6, 6, .6, 6, 24, M_DARK); frustum(M, -30, h + 5, -8, 14, 12, 12, 10, 12, M_GREYP); limb(M, [30, h + 5, -10], [30, h + 70, -10], 1.8, 1, M_GREYP, 6); ellip(M, 30, h + 72, -10, 2.6, 2.6, 2.6, M_RED, 5, 4);
-  for (const z of [-44, 44]) frustum(M, w + 12, 0, z * .5, 7, 7, 7, 7, 9, M_CRATE); limb(M, [w + 10, 0, 28], [w + 10, 22, 28], 5, 5, M_RUSTD, 8); return M;
+  const M = [], w = 66, d = 46, h = 56; slab(M, 0, 0, 0, w, d, h, 3, M_CON); slab(M, 0, h, 0, w + 4, d + 4, 5, 1.5, M_RPD); slab(M, w + 7, 32, 0, 7, d + 2, 7, 1.5, M_RPT, [1, d + 2]);
+  for (const z of [-30, -6, 18]) slab(M, w + .6, 14, z + 5, .6, 8, 14, .3, M_WIN); for (const x of [-42, -14, 14, 42]) slab(M, x, 22, d + .6, 8, .6, 16, .3, M_WIN);
+  slab(M, w + .6, 0, 0, .6, 6, 24, .3, M_DARK); slab(M, -30, h + 5, -8, 14, 12, 12, 2, M_GRY); cyl(M, [30, h + 5, -10], [30, h + 70, -10], 1.8, 1, M_GRY, 6); ellip(M, 30, h + 72, -10, 2.6, 2.6, 2.6, M_RED, 6, 4);
+  for (const z of [-44, 44]) slab(M, w + 12, 0, z * .5, 7, 7, 9, 2, M_CRATE); cyl(M, [w + 10, 0, 28], [w + 10, 22, 28], 5, 5, M_RPD, 10); return M;
 }
-const SP = { mac: [[], []], mech: [], gun: [[], []], skitter: [], ravager: [], p: {} };
+
+/* ---------- baking ---------- */
+const SP = { mac: [[], []], mech: [], gun: [[], []], skitter: null, ravager: null, chunk: [], p: {} };
 let READY = false;
+function initSets() { const mk = () => { const o = { body: [], scL: [], scR: [], tail: [] }; for (const n in o) for (let k = 0; k < 8; k++) o[n][k] = []; return o; }; SP.skitter = mk(); SP.ravager = mk(); SP.mech = []; for (let k = 0; k < 8; k++) SP.mech[k] = []; }
+/* ---- sprite cache (IndexedDB): the bake is heavy on phones, so keep the result ---- */
+function hashStr(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+const ASSET_V = 'sp1-' + hashStr([mechBody, gunMesh, macMesh, skitterParts, ravagerParts, chunkMesh, scrapModel, tankModel, poleModel, wreckModel, crystalModel, tumorModel, habModel, rasterTris, texEval, body, blade, loft, slab, surf, limb, ellip, ik2, gait, buildAssets, bakeParts].map(String).join('|') + JSON.stringify(MATS) + [MSC, GUN_N, MECH_S, GUN_S, MAC_S, JSON.stringify(SKC), JSON.stringify(RVC_)].join(','));
+function idbOpen() { return new Promise((res, rej) => { const r = indexedDB.open('lastlight', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function idbGet(k) { const db = await idbOpen(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+async function idbPut(k, v) { const db = await idbOpen(); return new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+function spEntries() {
+  const L = []; for (let k = 0; k < 8; k++) for (let f = 0; f < 9; f++) L.push(['m|' + k + '|' + f, SP.mech[k][f]]); for (const si of [0, 1]) for (let k = 0; k < GUN_N; k++) L.push(['g|' + si + '|' + k, SP.gun[si][k]]); for (const h of [0, 1]) for (let j = 0; j < 16; j++) L.push(['a|' + h + '|' + j, SP.mac[h][j]]);
+  for (const [nm, set, nf] of [['s', SP.skitter, 11], ['r', SP.ravager, 12]]) for (const part of ['body', 'scL', 'scR', 'tail']) for (let k = 0; k < 8; k++) for (let f = 0; f < nf; f++) L.push([nm + '|' + part + '|' + k + '|' + f, set[part][k][f]]);
+  for (let i = 0; i < 3; i++) L.push(['c|' + i, SP.chunk[i]]); for (const id in SP.p) L.push(['p|' + id, SP.p[id]]); return L;
+}
+function spAssign(key, rec) { const a = key.split('|'); switch (a[0]) { case 'm': SP.mech[+a[1]][+a[2]] = rec; break; case 'g': SP.gun[+a[1]][+a[2]] = rec; break; case 'a': SP.mac[+a[1]][+a[2]] = rec; break; case 's': SP.skitter[a[1]][+a[2]][+a[3]] = rec; break; case 'r': SP.ravager[a[1]][+a[2]][+a[3]] = rec; break; case 'c': SP.chunk[+a[1]] = rec; break; case 'p': SP.p[a[1]] = rec; break; } }
+async function saveAssets() {
+  try { const A = 2048, mkA = () => { const c = document.createElement('canvas'); c.width = c.height = A; return { c, x: 0, y: 0, rowH: 0, meta: [] }; }, atl = []; let cur = mkA();
+    for (const [key, rec] of spEntries()) { if (!rec || !rec.c) continue; const w = rec.c.width, h = rec.c.height; if (cur.x + w > A) { cur.x = 0; cur.y += cur.rowH + 1; cur.rowH = 0; } if (cur.y + h > A) { atl.push(cur); cur = mkA(); } cur.c.getContext('2d').drawImage(rec.c, cur.x, cur.y); cur.meta.push([key, cur.x, cur.y, w, h, rec.ox, rec.oy]); cur.x += w + 1; cur.rowH = Math.max(cur.rowH, h); }
+    atl.push(cur); const out = []; for (const a of atl) out.push({ blob: await new Promise(r => a.c.toBlob(r, 'image/png')), meta: a.meta }); await idbPut('sprites', { v: ASSET_V, atlases: out }); window.__saved = true; } catch (e) { window.__saveErr = String(e && e.name || e); }
+}
+async function loadAssets() {
+  try { const d = await idbGet('sprites'); if (!d || d.v !== ASSET_V) return false; initSets();
+    for (const a of d.atlases) { const bm = await createImageBitmap(a.blob); for (const [key, x, y, w, h, ox, oy] of a.meta) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(bm, x, y, w, h, 0, 0, w, h); spAssign(key, { c, ox, oy }); } }
+    return !!(SP.mech[0][0] && SP.skitter.body[0][0] && SP.p.h); } catch (e) { return false; }
+}
+async function bakeParts(framesParts, cfg, nWalk, yieldUI, tick) {
+  const names = ['body', 'scL', 'scR', 'tail'], out = {}; for (const n of names) { out[n] = []; for (let k = 0; k < 8; k++) out[n][k] = []; }
+  for (const k of [0, 1, 3, 4, 5]) { for (let f = 0; f < framesParts.length; f++) for (const n of names) out[n][k][f] = rasterTris(framesParts[f][n], k * PI4, cfg.S, cfg.ox, cfg.oy, cfg.sc, cfg.ao, cfg.ss); await yieldUI(); if (tick) tick(); }
+  for (const [k, src] of [[2, 0], [6, 4], [7, 3]]) for (let f = 0; f < framesParts.length; f++) { const sf = f < nWalk ? (f + nWalk / 2) % nWalk : f; out.body[k][f] = flipSpr(out.body[src][sf]); out.tail[k][f] = flipSpr(out.tail[src][sf]); out.scL[k][f] = flipSpr(out.scR[src][sf]); out.scR[k][f] = flipSpr(out.scL[src][sf]); }
+  return out;
+}
 async function buildAssets(setMsg) {
-  const yieldUI = () => new Promise(r => setTimeout(r, 0)), bodies = []; for (let f = 0; f < 7; f++) bodies.push(mechBody(f));
-  for (let k = 0; k < 8; k++) { SP.mech[k] = []; for (let f = 0; f < 7; f++) SP.mech[k][f] = rasterTris(bodies[f], k * PI4, MECH_S, MECH_OX, MECH_OY, MSC, 100); if (setMsg) setMsg('Forging ' + Math.round((k + 1) / 8 * 20) + '%'); await yieldUI(); }
-  for (const si of [0, 1]) { const gm = gunMesh(si ? 1 : -1); for (let k = 0; k < GUN_N; k++) SP.gun[si][k] = rasterTris(gm, k * TAU / GUN_N, GUN_S, GUN_S / 2, GUN_S / 2, MSC, 40); await yieldUI(); }
-  for (const hot of [0, 1]) { const mm = macMesh(hot); for (let k = 0; k < 16; k++) SP.mac[hot][k] = rasterTris(mm, k * TAU / 16, MAC_S, MAC_S / 2, MAC_S / 2, MSC, 40); await yieldUI(); }
-  const sk = [], rv = []; for (let f = 0; f < 6; f++) { sk.push(skitterModel(f)); rv.push(ravagerModel(f)); } for (const a of SK_ATK) sk.push(skitterModel(0, a)); for (const a of RV_ATK) rv.push(ravagerModel(0, a));
-  for (let k = 0; k < 8; k++) { SP.skitter[k] = []; SP.ravager[k] = []; for (let f = 0; f < sk.length; f++) SP.skitter[k][f] = rasterTris(sk[f], k * PI4, SKC.S, SKC.ox, SKC.oy, SKC.sc, 30); for (let f = 0; f < rv.length; f++) SP.ravager[k][f] = rasterTris(rv[f], k * PI4, RVC_.S, RVC_.ox, RVC_.oy, RVC_.sc, 60); if (setMsg) setMsg('Forging ' + Math.round(20 + (k + 1) / 8 * 70) + '%'); await yieldUI(); }
+  initSets(); const yieldUI = () => new Promise(r => setTimeout(r, 0)); let prog = 0; const tick = (n) => { prog += n || 1; if (setMsg) setMsg('Forging ' + Math.min(99, Math.round(prog / 34 * 100)) + '%'); };
+  const bodies = []; for (let f = 0; f < 9; f++) bodies.push(mechBody(f));
+  for (const k of [0, 1, 3, 4, 5]) { for (let f = 0; f < 9; f++) SP.mech[k][f] = rasterTris(bodies[f], k * PI4, MECH_S, MECH_OX, MECH_OY, MSC, 100, 1.5); tick(2); await yieldUI(); }
+  for (const [k, src] of [[2, 0], [6, 4], [7, 3]]) { for (let f = 0; f < 9; f++) SP.mech[k][f] = flipSpr(SP.mech[src][f < 8 ? (f + 4) % 8 : 8]); }
+  for (const si of [0, 1]) { const gm = gunMesh(si ? 1 : -1); for (let k = 0; k < GUN_N; k++) SP.gun[si][k] = rasterTris(gm, k * TAU / GUN_N, GUN_S, GUN_S / 2, GUN_S / 2, MSC, 40, 1.5); tick(2); await yieldUI(); }
+  for (const hot of [0, 1]) { const mm = macMesh(hot), done = []; for (let j = 0; j < 16; j++) { const pj = (4 - j + 16) % 16; SP.mac[hot][j] = pj < j && done[pj] ? flipSpr(done[pj]) : rasterTris(mm, j * TAU / 16, MAC_S, MAC_S / 2, MAC_S / 2, MSC, 40, 1.5); done[j] = SP.mac[hot][j]; } tick(2); await yieldUI(); }
+  const skF = []; for (let f = 0; f < 8; f++) skF.push(skitterParts(f)); for (const p of SK_POSE) skF.push(skitterParts(0, p)); SP.skitter = await bakeParts(skF, { S: SKC.S, ox: SKC.ox, oy: SKC.oy, sc: SKC.sc, ao: 30, ss: 1.75 }, 8, yieldUI, () => tick(3));
+  const rvF = []; for (let f = 0; f < 8; f++) rvF.push(ravagerParts(f)); for (const p of RV_POSE) rvF.push(ravagerParts(0, p)); SP.ravager = await bakeParts(rvF, { S: RVC_.S, ox: RVC_.ox, oy: RVC_.oy, sc: RVC_.sc, ao: 60, ss: 1.5 }, 8, yieldUI, () => tick(4));
+  for (let i = 0; i < 3; i++) SP.chunk[i] = rasterTris(chunkMesh(i), .6 * i, 40, 20, 20, 1.5, 10, 2);
   SP.p.k = bakeStatic(scrapModel(), 120, 1, 24); SP.p.n = bakeStatic(tankModel(), 120, 1, 50); SP.p.p = bakeStatic(poleModel(), 200, 1, 120); SP.p.f = bakeStatic(wreckModel(), 150, 1, 25, .45);
   SP.p.x = bakeStatic(crystalModel(), 120, 1, 36); SP.p.m = bakeStatic(tumorModel(), 120, 1, 30); await yieldUI(); SP.p.h = bakeStatic(habModel(), 340, 1, 140); READY = true;
 }
@@ -339,6 +453,7 @@ const sfx = {
   swing() { noise(.22, .16, 700, 'bandpass', 0, 2600); }, clang() { tone(1500, .08, 'square', .05, -600); noise(.08, .1, 3000, 'highpass'); }, dash() { noise(.3, .22, 2200, 'bandpass', 0, -1700); tone(120, .25, 'sawtooth', .12, 120); },
   step() { tone(56, .15, 'sine', .24, -24); noise(.09, .09, 240, 'lowpass'); },
   gun() { noise(.06, .08, 2600, 'bandpass'); tone(150, .05, 'square', .03, -80); }, boom() { noise(.5, .45, 900, 'lowpass', 0, -700); tone(70, .4, 'sine', .3, -45); },
+  rip() { noise(.24, .3, 600, 'lowpass', 0, -400); tone(180, .16, 'sawtooth', .1, -120); noise(.12, .18, 2400, 'bandpass'); },
   hit() { const n = performance.now(); if (n - lastHitSnd < 50) return; lastHitSnd = n; noise(.05, .05, 900, 'lowpass'); }, kill() { noise(.1, .07, 500, 'lowpass'); }, pick() { tone(900 + Math.random() * 300, .06, 'triangle', .03); },
   hurt() { noise(.3, .3, 400, 'lowpass', 0, -250); tone(90, .3, 'sawtooth', .16, -50); if (navigator.vibrate) navigator.vibrate(25); },
   level() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .18, 'triangle', .08, 0, AC && AC.currentTime + i * .07)); }, fire() { noise(.3, .1, 700, 'bandpass'); },
@@ -384,7 +499,7 @@ const cells = new Map(), lights = [], R = [], fireDecor = [], eL = [];
 let camSX = 0, camSY = 0;
 function newGame(demo) {
   G = { demo, t: 0, kills: 0, level: 1, xp: 0, need: NEED(1), pend: 0, hp: 120, maxhp: 120, x: 0, y: 0, vx: 0, vy: 0, bk: 0, ka: 0, stepN: 0, bump: 0, sq: 0, smk: 0, faceW: 0, faceA: 0, aimW: 0, walk: 0, moving: false, hurt: 0, inv: 0, muz: [0, 0], arm: 0,
-    wp: { gatling: 1, stomp: 1, machete: 1 }, dash: null, dashCd: 0, dashCdMax: 3.6, sw2: null, trail: [], ps: {}, wt: {}, mvT: { stomp: 3, vent: 0 }, sw: [], mvSaid: false, en: [], bl: [], gem: [], pt: [], fx: [], fire: [], tx: [], dec: [], ac: [],
+    wp: { gatling: 1, stomp: 1, machete: 1 }, dash: null, dashCd: 0, dashCdMax: 3.6, sw2: null, trail: [], ps: {}, wt: {}, mvT: { stomp: 3, vent: 0 }, sw: [], mvSaid: false, en: [], bl: [], gem: [], pt: [], fx: [], fire: [], tx: [], dec: [], ac: [], gibs: [], corp: [],
     spawnAcc: 0, ravT: 8, surges: [90, 170, 250, 330, 400, 450], evacSaid: false, sawRav: false, shake: 0, cx: 0, cy: 0, sub: null, subCd: 0, won: false, target: null, id: 1, flashW: 0, hint: 6 };
   if (demo) { G.wp = { gatling: 4, stomp: 1, vent: 1, machete: 2 }; G.t = 120; } recalc(); return G;
 }
@@ -414,7 +529,7 @@ const SX = (x, y) => (x - y) * IX - camSX, SY = (x, y) => (x + y) * IY - camSY;
 function spawnDist() { return Math.hypot(W, H) / 2 / Z / .6 + 80; }
 function spawnEnemy(kind, x, y) {
   const g = G, T = ET[kind], tm = g.t, hpM = 1 + tm / 150;
-  const e = { _k: 'e', k: kind, id: g.id++, x, y, r: T.r, hp: T.hp * hpM, spd: T.spd * (1 + Math.min(.3, tm / 1500)) * rand(.92, 1.08), dmg: T.dmg * (1 + tm / 600), kx: 0, ky: 0, flash: 0, ph: rand(0, 6), fa: 0, k8: undefined, cd: rand(1.5, 3.5), chg: 0, as: 0, at: 0, acd: rand(.2, .9), reach: T.r + 26 + (kind === 'ravager' ? 8 : 0), _d: 0 };
+  const e = { _k: 'e', k: kind, id: g.id++, x, y, r: T.r, hp: T.hp * hpM, spd: T.spd * (1 + Math.min(.3, tm / 1500)) * rand(.92, 1.08), dmg: T.dmg * (1 + tm / 600), kx: 0, ky: 0, flash: 0, ph: rand(0, 6), fa: 0, k8: undefined, rx: 0, ry: 0, sq: 0, lost: 0, rage: false, stun: 0, ripN: 0, cd: rand(1.5, 3.5), chg: 0, as: 0, at: 0, acd: rand(.2, .9), reach: T.r + 26 + (kind === 'ravager' ? 8 : 0), _d: 0 };
   e.maxhp = e.hp; g.en.push(e); return e;
 }
 function ringPos(d) { const a = rand(0, TAU); return [G.x + Math.cos(a) * d, G.y + Math.sin(a) * d]; }
@@ -432,21 +547,38 @@ const hashG = new Map(), HC = 56;
 function buildHash() { for (const a of hashG.values()) a.length = 0; if (hashG.size > 3000) hashG.clear(); for (const e of G.en) { const k = Math.floor(e.x / HC) * 100003 + Math.floor(e.y / HC); let a = hashG.get(k); if (!a) hashG.set(k, a = []); a.push(e); } }
 function near(x, y, r, fn) { const x0 = Math.floor((x - r) / HC), x1 = Math.floor((x + r) / HC), y0 = Math.floor((y - r) / HC), y1 = Math.floor((y + r) / HC); for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) { const a = hashG.get(i * 100003 + j); if (a) for (let n = 0; n < a.length; n++) fn(a[n]); } }
 function addText(x, y, txt, big, col) { const g = G; if (g.tx.length > 20) return; g.tx.push({ x: x + rand(-8, 8), y, z: 46 + rand(0, 10), txt, t: .6, big, col }); }
-function hurtEnemy(e, d, kx, ky, kb, quiet) {
-  if (e.hp <= 0) return; d *= G.dmgM; e.hp -= d; if (!quiet) { e.flash = .08; sfx.hit(); }
-  if (kb) { const m = e.k === 'ravager' ? .35 : 1; e.kx += kx * kb * m; e.ky += ky * kb * m; } if (d >= 1 && !quiet) addText(e.x, e.y, Math.round(d), d > 40); if (e.hp <= 0) killEnemy(e);
+const ICHOR = { skitter: '#c8702e', ravager: '#8fd13a' }, ICHOR_RGB = { skitter: '110,56,26', ravager: '60,110,30' }, LIMBS = [[1, 'scL'], [2, 'scR'], [4, 'tail']];
+function enemyFrame(e) { if (e.as > 0) return 7 + e.as; if (e.k === 'ravager' && e.chg > 0) return 11; return Math.floor((((e.ph * 1.6) % TAU) + TAU) % TAU * 8 / TAU) % 8; }
+function spray(e, kx, ky, n, power) { const col = ICHOR[e.k], a0 = (kx || ky) ? Math.atan2(ky, kx) : rand(0, TAU); for (let i = 0; i < n; i++) { const a = a0 + rand(-.5, .5), v = rand(90, 260) * (power || 1); pt(e.x, e.y, rand(24, 46), Math.cos(a) * v, Math.sin(a) * v, rand(40, 150), rand(.3, .6), col, rand(1.6, 2.8), 'spray'); } }
+function chunkGib(e, kx, ky) { const g = G, sp = rand(80, 210), a = ((kx || ky) ? Math.atan2(ky, kx) : rand(0, TAU)) + rand(-.8, .8); g.gibs.push({ x: e.x, y: e.y, z: rand(20, 40), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: rand(100, 220), rot: rand(0, 6), vr: rand(-12, 12), spr: SP.chunk[e.k === 'ravager' ? 1 : irand(0, 2)], t: 0, life: 6, land: false, b: 0, trail: 0 }); if (g.gibs.length > 46) g.gibs.shift(); }
+function ripLimb(e, bit, kx, ky, quiet) {
+  const g = G, part = LIMBS.find(l => l[0] === bit)[1], set = SP[e.k], k = e.k8 === undefined ? 0 : e.k8, spr = set[part][k][enemyFrame(e)], big = e.k === 'ravager', sp = rand(110, 230), a0 = (kx || ky) ? Math.atan2(ky, kx) : rand(0, TAU);
+  e.lost |= bit; if (!quiet) { e.rage = true; e.stun = Math.max(e.stun, .22); e.flash = .14; e.sq = 1; g.shake = Math.max(g.shake, big ? 6 : 3); sfx.rip(); }
+  g.gibs.push({ x: e.x, y: e.y, z: 34, vx: Math.cos(a0) * sp + rand(-70, 70), vy: Math.sin(a0) * sp + rand(-70, 70), vz: rand(150, 260), rot: 0, vr: rand(-10, 10), spr, t: 0, life: 9, land: false, b: 0, trail: 1 }); if (g.gibs.length > 46) g.gibs.shift();
+  spray(e, kx, ky, quiet ? 6 : big ? 18 : 12, 1.2); if (!quiet) for (let i = 0; i < 2; i++) chunkGib(e, kx, ky);
 }
-function killEnemy(e) {
-  const g = G, T = ET[e.k]; e.dead = true; g.kills++; sfx.kill(); if (!g.demo && g.hp < g.maxhp) { const h = e.k === 'ravager' ? 10 : 2; g.hp = Math.min(g.maxhp, g.hp + h); addText(g.x, g.y, '+' + h, false, '#7fcf6a'); } const n = e.k === 'ravager' ? 14 : 4;
-  for (let i = 0; i < n; i++) pt(e.x, e.y, 10 + rand(0, 14), rand(-90, 90), rand(-90, 90), rand(60, 200), rand(.4, .9), e.k === 'ravager' ? '#5a8a2a' : '#6a3a70', rand(2, 4), 'blood');
-  if (g.dec.length > 70) g.dec.shift(); g.dec.push({ x: e.x, y: e.y, r: e.k === 'ravager' ? 30 : 11, t: 20, c: e.k === 'ravager' ? '40,70,20' : '40,22,50', corpse: 1 }); if (T.xp) dropGem(e.x, e.y, T.xp);
+function ripRandom(e, kx, ky) { const avail = LIMBS.filter(l => !(e.lost & l[0])); if (avail.length) ripLimb(e, avail[irand(0, avail.length - 1)][0], kx, ky); }
+function hurtEnemy(e, d, kx, ky, kb, quiet) {
+  if (e.hp <= 0) return; const g = G, big = e.k === 'ravager'; d *= g.dmgM; e.hp -= d;
+  if (!quiet) { e.flash = .08; sfx.hit(); e.rx = clamp(e.rx + kx * (big ? 2.2 : 5), -14, 14); e.ry = clamp(e.ry + ky * (big ? 2.2 : 5), -14, 14); e.sq = 1; e.stun = Math.max(e.stun, big ? .04 : .09); if (e.as === 1) e.at = Math.max(0, e.at - .05); spray(e, kx, ky, big ? 2 : 3);
+    if (Math.random() < .16 && g.dec.length < 90) g.dec.push({ x: e.x + rand(-8, 8), y: e.y + rand(-8, 8), r: rand(5, 10), t: 16, c: ICHOR_RGB[e.k], corpse: 1 }); }
+  if (kb) { const m = big ? .35 : 1; e.kx += kx * kb * m; e.ky += ky * kb * m; } if (d >= 1 && !quiet) addText(e.x, e.y, Math.round(d), d > 40);
+  if (e.hp <= 0) { killEnemy(e, kx, ky); return; }
+  const r = e.hp / e.maxhp, st = [.72, .45, .22]; while (e.ripN < 3 && r < st[e.ripN]) { e.ripN++; ripRandom(e, kx, ky); } if (d >= e.maxhp * .3 && e.ripN < 3) { e.ripN++; ripRandom(e, kx, ky); }
+}
+function killEnemy(e, kx, ky) {
+  const g = G, T = ET[e.k], big = e.k === 'ravager'; e.dead = true; g.kills++; sfx.kill(); kx = kx || 0; ky = ky || 0;
+  if (!g.demo && g.hp < g.maxhp) { const h = big ? 10 : 2; g.hp = Math.min(g.maxhp, g.hp + h); addText(g.x, g.y, '+' + h, false, '#7fcf6a'); }
+  if (SP[e.k]) { const k = e.k8 === undefined ? 0 : e.k8, f = enemyFrame(e); for (const [bit] of LIMBS) if (!(e.lost & bit)) ripLimb(e, bit, kx, ky, true); g.corp.push({ x: e.x, y: e.y, spr: SP[e.k].body[k][f], t: 0 }); if (g.corp.length > 18) g.corp.shift(); for (let i = 0; i < (big ? 6 : 3); i++) chunkGib(e, kx, ky); }
+  spray(e, kx, ky, big ? 22 : 12, 1.3); for (let i = 0; i < (big ? 12 : 5); i++) pt(e.x, e.y, 10 + rand(0, 14), rand(-90, 90), rand(-90, 90), rand(60, 200), rand(.4, .9), ICHOR[e.k], rand(2, 4), 'blood');
+  if (g.dec.length > 90) g.dec.shift(); g.dec.push({ x: e.x, y: e.y, r: big ? 34 : 14, t: 22, c: ICHOR_RGB[e.k], corpse: 1 }); if (T.xp) dropGem(e.x, e.y, T.xp);
 }
 function dropGem(x, y, v) { const g = G; if (g.demo) return; if (g.gem.length > 180) { g.gem[irand(0, g.gem.length - 1)].v += v; return; } g.gem.push({ x, y, v, ph: rand(0, 6), mg: false, sp: 0 }); }
-function pt(x, y, z, vx, vy, vz, life, col, size, kind) { const g = G; if (g.pt.length > 280) return; g.pt.push({ x, y, z, vx, vy, vz, t: life, max: life, col, s: size, k: kind }); }
+function pt(x, y, z, vx, vy, vz, life, col, size, kind) { const g = G; if (g.pt.length > 420) return; g.pt.push({ x, y, z, vx, vy, vz, t: life, max: life, col, s: size, k: kind }); }
 function hurtPlayer(d) { const g = G; if (g.demo || g.inv > 0) return; g.hp -= d; g.inv = .5; g.hurt = .35; g.shake = Math.max(g.shake, 7); sfx.hurt(); if (g.hp < g.maxhp * .35) say(pick(LINES.hurt)); if (g.hp <= 0) endGame(false); }
 
-function muzzleWorld(si) { const g = G, s = si ? 1 : -1, yaw = g.bk * PI4, ay = g.ka * TAU / GUN_N; return [g.x + (-s * SH_Z * Math.sin(yaw) + Math.cos(ay) * 48) * MSC, g.y + (s * SH_Z * Math.cos(yaw) + Math.sin(ay) * 48) * MSC]; }
-function mechFrame() { const g = G; return g.moving ? Math.floor((((g.walk % TAU) + TAU) % TAU) / TAU * 6) % 6 : 6; }
+function muzzleWorld(si) { const g = G, s = si ? 1 : -1, yaw = g.bk * PI4, ay = g.ka * TAU / GUN_N; return [g.x + (-s * SH_Z * Math.sin(yaw) + Math.cos(ay) * 50) * MSC, g.y + (s * SH_Z * Math.cos(yaw) + Math.sin(ay) * 50) * MSC]; }
+function mechFrame() { const g = G; return g.moving ? Math.floor((((g.walk % TAU) + TAU) % TAU) / TAU * 8) % 8 : 8; }
 function startDash(wx, wy) {
   const g = G; if (g.dashCd > 0 || g.dash || g.demo) return false; const l = Math.hypot(wx, wy) || 1; wx /= l; wy /= l; const L = g.wp.charge ? CHG[g.wp.charge] : null, cdm = Math.max(.45, g.cdM);
   g.dash = { t: 0, dur: L ? L.dur : .2, spd: L ? L.spd : 760, dx: wx, dy: wy, hits: new Set(), L }; g.dashCdMax = (L ? L.cd : 3.6) * cdm; g.dashCd = g.dashCdMax; g.faceW = Math.atan2(wy, wx); g.inv = Math.max(g.inv, g.dash.dur + .12); g.shake = Math.max(g.shake, L ? 7 : 4); sfx.dash(); return true;
@@ -470,7 +602,7 @@ function macStep(dt) {
 }
 function plant() { const g = G, yaw = g.bk * PI4, c = Math.cos(yaw), sn = Math.sin(yaw), s = (g.stepN & 1) ? 1 : -1, lx_ = 4 * MSC, lz = s * 15 * MSC, fx = g.x + lx_ * c - lz * sn, fy = g.y + lx_ * sn + lz * c; g.bump = 1; g.sq = 1; g.shake = Math.max(g.shake, 1.8); if (!g.demo) sfx.step();
   for (let i = 0; i < 4; i++) pt(fx, fy, 3, rand(-35, 35), rand(-35, 35), rand(10, 30), rand(.5, .9), 'rgba(116,100,80,.5)', rand(6, 11), 'smoke'); }
-function exhaust() { const g = G, yaw = g.bk * PI4, c = Math.cos(yaw), sn = Math.sin(yaw); for (const z of [-9, 9]) { const lx_ = -16 * MSC, lz = z * MSC, wx = g.x + lx_ * c - lz * sn, wy = g.y + lx_ * sn + lz * c; pt(wx, wy, 100 * 1.04 * MSC, rand(-10, 10) - g.vx * .1, rand(-10, 10) - g.vy * .1, rand(25, 45), rand(.7, 1.2), 'rgba(26,24,24,.55)', rand(3, 5), 'smoke'); } }
+function exhaust() { const g = G, yaw = g.bk * PI4, c = Math.cos(yaw), sn = Math.sin(yaw); for (const z of [-9, 9]) { const lx_ = -16 * MSC, lz = z * MSC, wx = g.x + lx_ * c - lz * sn, wy = g.y + lx_ * sn + lz * c; pt(wx, wy, 104 * 1.04 * MSC, rand(-10, 10) - g.vx * .1, rand(-10, 10) - g.vy * .1, rand(25, 45), rand(.7, 1.2), 'rgba(26,24,24,.55)', rand(3, 5), 'smoke'); } }
 function updWeapons(dt) {
   const g = G, W_ = g.wp, cdm = Math.max(.45, g.cdM); let best = null, bd = 600 * 600;
   for (const e of g.en) { const d = (e.x - g.x) ** 2 + (e.y - g.y) ** 2; if (d < bd) { bd = d; best = e; } }
@@ -489,14 +621,14 @@ function updWeapons(dt) {
   if (W_.gatling && T('gatling') <= 0 && best) {
     const L = GAT[W_.gatling]; g.wt.gatling = L.cd * cdm;
     for (let i = 0; i < L.n; i++) { const si = (g.arm ^ (i & 1)) ? 1 : 0, [mx, my] = muzzleWorld(si), a = Math.atan2(best.y - my, best.x - mx) + (i - (L.n - 1) / 2) * .07 + rand(-.03, .03); g.bl.push({ x: mx, y: my, vx: Math.cos(a) * 780, vy: Math.sin(a) * 780, dmg: L.dmg, life: .7, pierce: L.pierce, hit: [] }); }
-    g.muz[g.arm] = .07; if (L.n > 1) g.muz[g.arm ^ 1] = .07; g.arm ^= 1; sfx.gun();
+    g.muz[g.arm] = .07; if (L.n > 1) g.muz[g.arm ^ 1] = .07; { const [bx, by] = muzzleWorld(g.arm), sg = g.arm ? 1 : -1; pt(bx, by, MUZ_H - 4, -Math.sin(g.aimW) * sg * rand(70, 120) + rand(-20, 20), Math.cos(g.aimW) * sg * rand(70, 120) + rand(-20, 20), rand(90, 160), .6, '#e6c35a', 1.8, 'spark'); } g.shake = Math.max(g.shake, .9); g.arm ^= 1; sfx.gun();
   }
 }
 function updProjectiles(dt) {
   const g = G;
   for (const b of g.bl) { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
     near(b.x, b.y, 24, e => { if (b.life <= 0 || e.dead || b.hit.includes(e.id)) return; const dx = e.x - b.x, dy = e.y - b.y;
-      if (dx * dx + dy * dy < (e.r + 5) ** 2) { hurtEnemy(e, b.dmg, b.vx / 780, b.vy / 780, 60); b.hit.push(e.id); if (Q > .7) for (let i = 0; i < 2; i++) pt(b.x, b.y, 40, rand(-80, 80), rand(-80, 80), rand(20, 100), .25, '#ffd070', 1.8, 'spark'); if (b.pierce-- <= 0) b.life = 0; } }); }
+      if (dx * dx + dy * dy < (e.r + 5) ** 2) { hurtEnemy(e, b.dmg, b.vx / 780, b.vy / 780, 110); b.hit.push(e.id); if (Q > .7) for (let i = 0; i < 3; i++) pt(b.x, b.y, 40, rand(-80, 80), rand(-80, 80), rand(20, 100), .25, '#ffd070', 1.8, 'spark'); if (b.pierce-- <= 0) b.life = 0; } }); }
   g.bl = g.bl.filter(b => b.life > 0);
   for (const f of g.fire) { f.life -= dt; f.tick -= dt; if (f.tick <= 0) { f.tick = .25; near(f.x, f.y, f.r + 30, e => { if (!e.dead && Math.hypot(e.x - f.x, e.y - f.y) < f.r + e.r * .6) hurtEnemy(e, f.dmg, 0, 0, 0, true); }); }
     if (Q > .7 && Math.random() < dt * 10) pt(f.x + rand(-f.r, f.r) * .7, f.y + rand(-f.r, f.r) * .7, 4, rand(-8, 8), rand(-8, 8), rand(40, 100), rand(.5, 1), '#ffb23a', rand(1.5, 2.4), 'ember'); }
@@ -518,6 +650,7 @@ function update(dt) {
   let ix = 0, iy = 0; if (keys.w || keys.arrowup) iy -= 1; if (keys.s || keys.arrowdown) iy += 1; if (keys.a || keys.arrowleft) ix -= 1; if (keys.d || keys.arrowright) ix += 1; if (stick) { ix = stick.dx; iy = stick.dy; }
   if (g.demo) { const a = g.t * .45; ix = Math.cos(a); iy = Math.sin(a * 1.3); }
   let m = Math.hypot(ix, iy); if (m > 1) { ix /= m; iy /= m; m = 1; }
+  { const spn = Math.min(1.5, Math.hypot(g.vx, g.vy) / g.spd), tz = 1 - .08 * Math.min(1, spn) - (g.dash ? .09 : 0); zoomK += (tz - zoomK) * Math.min(1, dt * 2.5); }
   if (g.dashCd > 0) g.dashCd -= dt; stickDash(dt); if (g.dash) dashStep(dt); else { const wx = (ix + iy) / 1.4142, wy = (-ix + iy) / 1.4142, sp = m > .08 ? g.spd * (g.demo ? .6 : 1) * Math.max(.4, m) : 0, tvx = wx * sp, tvy = wy * sp, acc = (m > .08 ? 1250 : 1800) * dt, dvx = tvx - g.vx, dvy = tvy - g.vy, dl = Math.hypot(dvx, dvy);
     if (dl <= acc) { g.vx = tvx; g.vy = tvy; } else { g.vx += dvx / dl * acc; g.vy += dvy / dl * acc; } }
   const spdv = Math.hypot(g.vx, g.vy); g.moving = spdv > 14; g.x += g.vx * dt; g.y += g.vy * dt;
@@ -529,11 +662,11 @@ function update(dt) {
   spawnLogic(dt); buildHash();
   for (const e of g.en) {
     const dx = g.x - e.x, dy = g.y - e.y, d = Math.hypot(dx, dy) || 1; e.flash = Math.max(0, e.flash - dt); e.acd = Math.max(0, e.acd - dt); if (e.burn > 0) { e.burn -= dt; e.bt -= dt; if (e.bt <= 0) { e.bt = .5; hurtEnemy(e, e.bd, 0, 0, 0, true); } } e.fa = Math.atan2(dy, dx); e.k8 = hyst(e.k8, e.fa, 8);
-    let mx = dx / d, my = dy / d, sp = e.spd; const big = e.k === 'ravager', reach = e.reach;
+    e.rx *= Math.max(0, 1 - 16 * dt); e.ry *= Math.max(0, 1 - 16 * dt); e.sq = Math.max(0, e.sq - dt * 8); const rg = e.rage ? 1.3 : 1; let mx = dx / d, my = dy / d, sp = e.spd * rg * (e.stun > 0 ? .2 : 1); if (e.stun > 0) e.stun -= dt; const big = e.k === 'ravager', reach = e.reach;
     if (e.as === 0 && e.acd <= 0 && d < reach) { e.as = 1; e.at = 0; }
     if (e.as > 0) { e.at += dt; sp = 0;
-      if (e.as === 1 && e.at >= (big ? .6 : .32)) { e.as = 2; e.at = 0; if (d < reach + 14 && !g.demo) hurtPlayer(e.dmg); if (big) g.shake = Math.max(g.shake, 5); else { e.kx += mx * 240; e.ky += my * 240; } }
-      else if (e.as === 2 && e.at >= .12) { e.as = 3; e.at = 0; } else if (e.as === 3 && e.at >= .28) { e.as = 0; e.acd = big ? 1.7 : .85; } }
+      if (e.as === 1 && e.at >= (big ? .6 : .32) / rg) { e.as = 2; e.at = 0; if (d < reach + 14 && !g.demo) hurtPlayer(e.dmg); if (big) g.shake = Math.max(g.shake, 5); else { e.kx += mx * 240; e.ky += my * 240; } }
+      else if (e.as === 2 && e.at >= .12) { e.as = 3; e.at = 0; } else if (e.as === 3 && e.at >= .28) { e.as = 0; e.acd = (big ? 1.7 : .85) / (e.rage ? 1.35 : 1); } }
     else {
       if (d < 70) sp *= Math.max(.3, d / 70);
       if (!big) { const w = Math.sin(e.ph * .6) * .35, tx = mx; mx = mx - my * w; my = my + tx * w; }
@@ -550,7 +683,10 @@ function update(dt) {
   g.gem = g.gem.filter(q => !q.done);
   for (const f of g.fx) f.t += dt; g.fx = g.fx.filter(f => f.t < f.dur); for (const s of g.sw) s.t += dt; g.sw = g.sw.filter(s => s.t < s.dur);
   for (const p of g.pt) { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.k === 'smoke' || p.k === 'ember') { p.z += p.vz * dt; p.vx *= .98; } else { p.vz -= 520 * dt; p.z += p.vz * dt; if (p.z < 0) { p.z = 0; p.vz *= -.3; p.vx *= .6; p.vy *= .6; } } }
-  g.pt = g.pt.filter(p => p.t > 0); for (const t of g.tx) { t.t -= dt; t.z += 40 * dt; } g.tx = g.tx.filter(t => t.t > 0); for (const d of g.dec) d.t -= dt; g.dec = g.dec.filter(d => d.t > 0);
+  g.pt = g.pt.filter(p => p.t > 0); for (const q of g.gibs) { q.t += dt; if (!q.land) { q.vz -= 620 * dt; q.z += q.vz * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; if (q.trail && Math.random() < .6) pt(q.x, q.y, q.z, rand(-12, 12), rand(-12, 12), rand(-10, 20), .4, '#9a4a2a', 2, 'spray');
+      if (q.z <= 0) { q.z = 0; if (Math.abs(q.vz) > 90 && q.b < 2) { q.vz = -q.vz * .35; q.vx *= .55; q.vy *= .55; q.vr *= .5; q.b++; } else { q.land = true; q.vr = 0; if (g.dec.length < 90) g.dec.push({ x: q.x, y: q.y, r: 9, t: 14, c: '90,40,25', corpse: 1 }); } } } else { q.vx *= .9; q.vy *= .9; q.x += q.vx * dt * .3; q.y += q.vy * dt * .3; } }
+  g.gibs = g.gibs.filter(q => q.t < q.life); for (const c of g.corp) c.t += dt; g.corp = g.corp.filter(c => c.t < 7);
+  for (const t of g.tx) { t.t -= dt; t.z += 40 * dt; } g.tx = g.tx.filter(t => t.t > 0); for (const d of g.dec) d.t -= dt; g.dec = g.dec.filter(d => d.t > 0);
   g.cx += (g.x + g.vx * .3 - g.cx) * Math.min(1, dt * 5); g.cy += (g.y + g.vy * .3 - g.cy) * Math.min(1, dt * 5); g.shake = Math.max(0, g.shake - dt * 30);
   if (Q > .7 && Math.random() < dt * 4) { const a = rand(0, TAU), d = rand(50, 400); pt(g.x + Math.cos(a) * d, g.y + Math.sin(a) * d, rand(0, 40), rand(-6, 6), rand(-6, 6), rand(20, 50), rand(1.5, 3), '#ffa040', rand(1, 2), 'ember'); }
   if (!g.demo) { if (g.pend > 0 && state === 'play') openLevelUp(); if (!g.won && g.t >= EVAC) { g.won = true; endGame(true); } }
@@ -567,30 +703,41 @@ function flame(X, Y, w, h, t, sd) {
   layer(1, 'rgba(190,50,10,.9)'); layer(.7, 'rgba(255,130,30,.95)'); layer(.38, 'rgba(255,225,130,.95)');
 }
 function drawSpr(sp, X, Y, flash) { ctx.drawImage(flash ? flashOf(sp.c) : sp.c, X - sp.ox, Y - sp.oy, sp.c.width, sp.c.height); }
+const darkCache = new WeakMap();
+function darkOf(c) { let d = darkCache.get(c); if (!d) { d = document.createElement('canvas'); d.width = c.width; d.height = c.height; const x = d.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(8,4,6,.6)'; x.fillRect(0, 0, d.width, d.height); darkCache.set(c, d); } return d; }
 function drawMech(X, Y) {
-  const g = G, k = g.bk, yaw = k * PI4, f = mechFrame(), bob = mechBob(f), flash = g.hurt > 0 && Math.floor(g.hurt * 40) % 2 === 0, sq = g.sq;
-  ctx.globalAlpha = 1; ctx.drawImage(SHADOW, X - 54, Y - 22, 108, 54); ctx.save(); ctx.translate(X, Y); ctx.scale(1 + .025 * sq, 1 - .045 * sq); ctx.translate(-X, -Y);
+  const g = G, k = g.bk, yaw = k * PI4, f = mechFrame(), bob = mechBob(f), flash = g.hurt > 0 && Math.floor(g.hurt * 40) % 2 === 0, sq = g.sq, idleY = g.moving || g.dash ? 0 : Math.sin(g.t * 2.3) * .9, vib = g.moving ? 0 : Math.sin(g.t * 38) * .35;
+  ctx.globalAlpha = 1; ctx.drawImage(SHADOW, X - 54, Y - 22, 108, 54); ctx.save(); ctx.translate(X, Y); ctx.scale(1 + .025 * sq, 1 - .045 * sq); ctx.translate(-X + vib, -Y + idleY);
   const ay = g.ka * TAU / GUN_N, guns = [];
-  for (const s of [-1, 1]) { const si = s > 0 ? 1 : 0, pv = pl(0, SH_Y + bob, s * SH_Z, yaw, MSC), xr = -s * SH_Z * Math.sin(yaw), zr = s * SH_Z * Math.cos(yaw), close = (xr + Math.cos(ay) * 24) + (zr + Math.sin(ay) * 24); guns.push({ spr: SP.gun[si][g.ka], x: X + pv[0], y: Y + pv[1], behind: close < 0, si }); }
+  for (const s of [-1, 1]) { const si = s > 0 ? 1 : 0, pv = pl(0, SH_Y + bob, s * SH_Z, yaw, MSC), xr = -s * SH_Z * Math.sin(yaw), zr = s * SH_Z * Math.cos(yaw), close = (xr + Math.cos(ay) * 24) + (zr + Math.sin(ay) * 24), kick = Math.min(1, g.muz[si] / .07) * 3.5;
+    guns.push({ spr: SP.gun[si][g.ka], x: X + pv[0] - (Math.cos(ay) - Math.sin(ay)) * IX * kick, y: Y + pv[1] - (Math.cos(ay) + Math.sin(ay)) * IY * kick, behind: close < 0 }); }
   let mac = null; if (g.sw2) { const S = g.sw2, u = clamp(S.t / S.dur, 0, 1), ang = lerp(S.a0, S.a1, u * u * (3 - 2 * u)), kk = ((Math.round(ang / (TAU / 16)) % 16) + 16) % 16; mac = { spr: SP.mac[S.L.burn ? 1 : 0][kk], sc: S.L.reach / 120, behind: Math.cos(ang) + Math.sin(ang) < -.15, a: 1 - clamp((S.t - S.dur) / .14, 0, 1) }; }
-  const drawMac = () => { const py = Y - (58 + bob) * 1.04 * MSC, w = MAC_S * mac.sc; ctx.globalAlpha = mac.a; ctx.drawImage(mac.spr, X - w / 2, py - w / 2, w, w); ctx.globalAlpha = 1; };
-  if (mac && mac.behind) drawMac();
-  for (const q of guns) if (q.behind) ctx.drawImage(q.spr, q.x - GUN_S / 2, q.y - GUN_S / 2);
-  const body = SP.mech[k][f]; ctx.drawImage(flash ? flashOf(body) : body, X - MECH_OX, Y - MECH_OY);
-  for (const q of guns) if (!q.behind) ctx.drawImage(q.spr, q.x - GUN_S / 2, q.y - GUN_S / 2);
-  if (mac && !mac.behind) drawMac();
-  ctx.restore();
+  const drawMac = () => { const py = Y - (58 + bob) * 1.04 * MSC, sc = mac.sc, sp = mac.spr; ctx.globalAlpha = mac.a; ctx.drawImage(sp.c, X - sp.ox * sc, py - sp.oy * sc, sp.c.width * sc, sp.c.height * sc); ctx.globalAlpha = 1; };
+  if (mac && mac.behind) drawMac(); for (const q of guns) if (q.behind) ctx.drawImage(q.spr.c, q.x - q.spr.ox, q.y - q.spr.oy);
+  const body = SP.mech[k][f]; ctx.drawImage(flash ? flashOf(body.c) : body.c, X - body.ox, Y - body.oy);
+  for (const q of guns) if (!q.behind) ctx.drawImage(q.spr.c, q.x - q.spr.ox, q.y - q.spr.oy); if (mac && !mac.behind) drawMac(); ctx.restore();
 }
 function drawEnemy(e, X, Y) {
-  const big = e.k === 'ravager', k = e.k8 === undefined ? 0 : e.k8; let f; if (e.as > 0) f = 5 + e.as; else if (big && e.chg > 0) f = 9; else f = Math.floor((((e.ph * 1.6) % TAU) + TAU) % TAU / TAU * 6) % 6;
-  const sp = big ? SP.ravager[k][f] : SP.skitter[k][f], c = big ? RVC_ : SKC;
-  ctx.drawImage(SHADOW, X - (big ? 66 : 36), Y - (big ? 28 : 15), big ? 132 : 72, big ? 56 : 30); ctx.drawImage(e.flash > 0 ? flashOf(sp) : sp, X - c.ox, Y - c.oy);
-  if (e.hp < e.maxhp) { const w = big ? 56 : 26, yy = Y - (big ? 118 : 64); ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(X - w / 2 - 1, yy - 1, w + 2, 4.5); ctx.fillStyle = big ? '#9a3a22' : '#b84a2a'; ctx.fillRect(X - w / 2, yy, w * e.hp / e.maxhp, 2.5); }
+  const big = e.k === 'ravager', set = big ? SP.ravager : SP.skitter, K = big ? RVC_ : SKC, k = e.k8 === undefined ? 0 : e.k8, f = enemyFrame(e), yaw = k * PI4, c_ = Math.cos(yaw), s_ = Math.sin(yaw);
+  X += (e.rx - e.ry) * IX; Y += (e.rx + e.ry) * IY; ctx.drawImage(SHADOW, X - (big ? 66 : 36), Y - (big ? 28 : 15), big ? 132 : 72, big ? 56 : 30);
+  const squash = e.sq > .02; if (squash) { ctx.save(); ctx.translate(X, Y); ctx.scale(1 + .1 * e.sq, 1 - .13 * e.sq); ctx.translate(-X, -Y); }
+  const fl = e.flash > 0, draw = sp => { if (sp && sp.c.width > 1) ctx.drawImage(fl ? flashOf(sp.c) : sp.c, X - sp.ox, Y - sp.oy); }, near = (sg) => (K.cx * (c_ + s_) + sg * K.cz * (c_ - s_)) > 0, tailNear = -(c_ + s_) > 0;
+  const L = !(e.lost & 1), R_ = !(e.lost & 2), T_ = !(e.lost & 4);
+  if (T_ && !tailNear) draw(set.tail[k][f]); if (L && !near(-1)) draw(set.scL[k][f]); if (R_ && !near(1)) draw(set.scR[k][f]);
+  draw(set.body[k][f]);
+  if (T_ && tailNear) draw(set.tail[k][f]); if (L && near(-1)) draw(set.scL[k][f]); if (R_ && near(1)) draw(set.scR[k][f]);
+  if (squash) ctx.restore();
+  if (e.hp < e.maxhp) { const w = big ? 56 : 26, yy = Y - (big ? 128 : 74); ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(X - w / 2 - 1, yy - 1, w + 2, 4.5); ctx.fillStyle = e.rage ? '#d03a22' : big ? '#9a3a22' : '#b84a2a'; ctx.fillRect(X - w / 2, yy, w * e.hp / e.maxhp, 2.5); }
 }
+function drawGib(q, X, Y) {
+  const sp = q.spr; if (!sp || sp.c.width < 2) return; const w = sp.c.width, h = sp.c.height, cx = w / 2 - sp.ox, cy = h / 2 - sp.oy, a = clamp((q.life - q.t) / 2, 0, 1);
+  if (!q.land) ctx.drawImage(SHADOW, X - 12, Y - 5, 24, 10); ctx.save(); ctx.globalAlpha = a; if (q.land) { ctx.translate(X + cx * .5, Y + cy * .3); ctx.scale(1, .72); } else ctx.translate(X + cx, Y - q.z + cy); ctx.rotate(q.rot); ctx.drawImage(q.land ? darkOf(sp.c) : sp.c, -w / 2, -h / 2); ctx.restore(); ctx.globalAlpha = 1;
+}
+function drawCorpse(c, X, Y) { const sp = c.spr; if (!sp || sp.c.width < 2) return; const u = clamp(c.t / .22, 0, 1), a = clamp((7 - c.t) / 2.5, 0, 1); ctx.save(); ctx.globalAlpha = a; ctx.translate(X, Y); ctx.scale(1 + .22 * u, 1 - .68 * u); ctx.translate(-X, -Y); ctx.drawImage(u > .5 ? darkOf(sp.c) : sp.c, X - sp.ox, Y - sp.oy); ctx.restore(); ctx.globalAlpha = 1; }
 function drawProp(o, X, Y) { const sp = SP.p[o._k]; if (!sp) return; const s = o._k === 'h' ? 1 : o.s * .92; if (o._k === 'f' || o._k === 'm') { ctx.drawImage(SHADOW, X - 34 * s, Y - 14 * s, 68 * s, 34 * s); } ctx.drawImage(sp.c, X - sp.ox * s, Y - sp.oy * s, sp.c.width * s, sp.c.height * s); }
 
 function render() {
-  const g = G, t = performance.now() / 1000, lowfx = Q <= .7; frameNo++;
+  Z = Zb * zoomK; const g = G, t = performance.now() / 1000, lowfx = Q <= .7; frameNo++;
   camSX = (g.cx - g.cy) * IX + (Math.random() - .5) * g.shake; camSY = (g.cx + g.cy) * IY + (Math.random() - .5) * g.shake + g.bump * 3;
   const prog = clamp(g.t / EVAC, 0, 1), hw = OX / Z + 110, hhT = OY / Z + 150, hhB = (H - OY) / Z + 150;
   const cs = [[-hw, -hhT], [hw, -hhT], [hw, hhB], [-hw, hhB]].map(([a, b]) => { const u = (a + camSX) / IX, v = (b + camSY) / IY; return [(u + v) / 2, (v - u) / 2]; });
@@ -613,10 +760,10 @@ function render() {
     if (o._k === 'f') { lights.push(X, Y - 10, 190 * o.s, .95, 0); fireDecor.push(o); } else if (o._k === 'p') lights.push(X + 10, Y - 100, 280, 1, 1); else if (o._k === 'x') lights.push(X, Y - 10, 110, .7, 1); else if (o._k === 'm') lights.push(X, Y - 14, 130, .75, 3);
   }
   { const X = SX(HAB.x, HAB.y), Y = SY(HAB.x, HAB.y); if (Math.abs(X) < hw + 200 && Y > -hhT - 200 && Y < hhB + 200) { HAB._d = HAB.x + HAB.y; HAB._k = 'h'; R.push(HAB); lights.push(X + 30, Y - 28, 230, .85, 0); } }
-  for (const e of g.en) { e._d = e.x + e.y; R.push(e); } g._d = g.x + g.y; g._k = 'p0'; R.push(g); R.sort((a, b) => a._d - b._d);
+  for (const e of g.en) { e._d = e.x + e.y; R.push(e); } for (const q of g.gibs) { q._d = q.x + q.y; q._k = 'g'; R.push(q); } for (const c of g.corp) { c._d = c.x + c.y - 2; c._k = 'c'; R.push(c); } g._d = g.x + g.y; g._k = 'p0'; R.push(g); R.sort((a, b) => a._d - b._d);
   if (READY) for (const o of R) {
     const X = SX(o.x, o.y), Y = SY(o.x, o.y); if (X < -hw - 120 || X > hw + 120 || Y < -hhT - 140 || Y > hhB + 140) continue;
-    if (o._k === 'e') { drawEnemy(o, X, Y); eL.push(X, Y); } else if (o._k === 'p0') drawMech(X, Y); else drawProp(o, X, Y);
+    if (o._k === 'e') { drawEnemy(o, X, Y); eL.push(X, Y); } else if (o._k === 'p0') drawMech(X, Y); else if (o._k === 'g') drawGib(o, X, Y); else if (o._k === 'c') drawCorpse(o, X, Y); else drawProp(o, X, Y);
   }
   // ---- lighting: near-black ambient with holes for light sources
   const px = SX(g.x, g.y), py = SY(g.x, g.y), ls = RS * .5, ambA = lerp(.84, .6, prog * prog), dw = prog * prog;
@@ -648,13 +795,14 @@ function render() {
   // ore shards
   for (const q of g.gem) { const X = SX(q.x, q.y), Y = SY(q.x, q.y); if (Math.abs(X) > hw || Y < -hhT || Y > hhB) continue; const big = q.v >= 15, mid = q.v >= 3, s = big ? 5.5 : mid ? 4.5 : 3.4, by = Y - 7 - Math.sin(t * 4 + q.ph) * 2, spr = big ? GL.m : mid ? GL.y : GL.c;
     glow(spr, X, by, s * 5, .6); ctx.globalAlpha = 1; ctx.fillStyle = big ? '#ffc0f0' : mid ? '#ffeaa0' : '#c8f0ff'; ctx.beginPath(); ctx.moveTo(X, by - s * 1.5); ctx.lineTo(X + s * .8, by); ctx.lineTo(X, by + s); ctx.lineTo(X - s * .8, by); ctx.closePath(); ctx.fill(); }
-  // eyes, acid sacs and attack telegraphs on enemies (visible in the dark)
-  if (READY) for (const e of g.en) { const X = SX(e.x, e.y), Y = SY(e.x, e.y); if (X < -hw || X > hw || Y < -hhT || Y > hhB) continue; const yaw = (e.k8 || 0) * PI4, big = e.k === 'ravager';
+  // eyes, acid sacs, rage glow and attack telegraphs on enemies (visible in the dark)
+  if (READY) for (const e of g.en) { let X = SX(e.x, e.y), Y = SY(e.x, e.y); if (X < -hw || X > hw || Y < -hhT || Y > hhB) continue; X += (e.rx - e.ry) * IX; Y += (e.rx + e.ry) * IY; const yaw = (e.k8 || 0) * PI4, big = e.k === 'ravager', K = big ? RVC_ : SKC;
     if (e.burn > 0) { glow(GL.o, X, Y - 38, 28, .6); ctx.globalAlpha = 1; flame(X, Y - 18, 8, 28, t, e.id); }
-    if (e.as === 1) { const u = e.at / (big ? .6 : .32); ctx.strokeStyle = `rgba(255,80,40,${.2 + .6 * u})`; ctx.lineWidth = 2; ell(X, Y, (e.reach + 6) * 1.2, (e.reach + 6) * .6); ctx.stroke(); ctx.fillStyle = `rgba(255,60,30,${.08 * u})`; ctx.fill(); }
+    if (e.rage) { glow(GL.r, X, Y - (big ? 40 : 24), big ? 52 : 30, .3 + .1 * Math.sin(t * 9 + e.id)); ctx.globalAlpha = 1; }
+    if (e.as === 1) { const u = e.at / ((big ? .6 : .32) / (e.rage ? 1.3 : 1)); ctx.strokeStyle = `rgba(255,80,40,${.2 + .6 * Math.min(1, u)})`; ctx.lineWidth = 2; ell(X, Y, (e.reach + 6) * 1.2, (e.reach + 6) * .6); ctx.stroke(); ctx.fillStyle = `rgba(255,60,30,${.08 * Math.min(1, u)})`; ctx.fill(); }
     if (e.as === 0) {
-      if (!big) { for (const s of [-1, 1]) { const p = pl(20, 12, s * 3.4, yaw, 1.7); glow(GL.o, X + p[0], Y + p[1], 6, .6); ctx.fillStyle = 'rgba(255,170,90,.95)'; ctx.fillRect(X + p[0] - 1, Y + p[1] - 1, 2, 2); } ctx.globalAlpha = 1; }
-      else { const s1 = pl(-10, 39, -7, yaw, 1.7), s2 = pl(-6, 37, 9, yaw, 1.7), pul = e.chg > 0 ? 1 : .55 + .25 * Math.sin(t * 3 + e.ph); glow(GL.g, X + s1[0], Y + s1[1], 30, .55 * pul); glow(GL.g, X + s2[0], Y + s2[1], 26, .5 * pul); const m = pl(37, 19, 0, yaw, 1.7); glow(GL.g, X + m[0], Y + m[1], 12, .8); ctx.globalAlpha = 1; }
+      if (!big) { for (const q of SK_EYE) { const p = pl(q[0], q[1], q[2], yaw, K.sc); glow(e.rage ? GL.r : GL.o, X + p[0], Y + p[1], e.rage ? 9 : 6, .7); ctx.fillStyle = e.rage ? 'rgba(255,120,100,.95)' : 'rgba(255,170,90,.95)'; ctx.fillRect(X + p[0] - 1, Y + p[1] - 1, 2, 2); } ctx.globalAlpha = 1; }
+      else { const pul = e.chg > 0 ? 1 : .55 + .25 * Math.sin(t * 3 + e.ph); for (const q of RV_SAC) { const p = pl(q[0], q[1], q[2], yaw, K.sc); glow(GL.g, X + p[0], Y + p[1], 28, .5 * pul); } const m = pl(RV_MOUTH[0], RV_MOUTH[1], RV_MOUTH[2], yaw, K.sc); glow(GL.g, X + m[0], Y + m[1], 12, .8); ctx.globalAlpha = 1; }
     } }
   // tracers
   for (const b of g.bl) { const X = SX(b.x, b.y), Y = SY(b.x, b.y) - MUZ_H, tx = SX(b.x - b.vx * .05, b.y - b.vy * .05), ty = SY(b.x - b.vx * .05, b.y - b.vy * .05) - MUZ_H;
@@ -673,6 +821,7 @@ function render() {
   // particles
   for (const p of g.pt) { const X = SX(p.x, p.y), Y = SY(p.x, p.y) - p.z, k = p.t / p.max;
     if (p.k === 'smoke') { ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.fillStyle = p.col; ctx.globalAlpha = Math.min(1, k * 1.2); ctx.beginPath(); ctx.arc(X, Y, p.s * (1.6 - k * .6), 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1; }
+    else if (p.k === 'spray') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = p.col; ctx.lineWidth = p.s; ctx.globalAlpha = Math.min(1, k * 1.6); const sx_ = (p.vx - p.vy) * IX * .03, sy_ = ((p.vx + p.vy) * IY - p.vz) * .03; ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X - sx_, Y - sy_); ctx.stroke(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1; }
     else if (p.k === 'blood') { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = p.col; ctx.globalAlpha = Math.min(1, k * 2); ctx.fillRect(X - p.s / 2, Y - p.s / 2, p.s, p.s); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1; }
     else { ctx.globalAlpha = Math.min(1, k * 1.6); ctx.fillStyle = p.col; ctx.fillRect(X - p.s / 2, Y - p.s / 2, p.s, p.s); } }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -755,7 +904,9 @@ function frame(now) {
 }
 resize(); newGame(true);
 (async () => {
-  const btn = $('startBtn'); await buildAssets(m => { btn.textContent = m; });
+  const btn = $('startBtn'), tb = performance.now(); btn.textContent = 'Loading…'; let ok = false; try { ok = await loadAssets(); } catch (e) { ok = false; }
+  window.__boot = { cached: ok, ms: Math.round(performance.now() - tb) };
+  if (!ok) { await buildAssets(m => { btn.textContent = m; }); saveAssets(); } else READY = true;
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { getChunk(i, j); } pumpChunks(9); btn.textContent = 'Deploy'; btn.disabled = false;
 })();
 requestAnimationFrame(t => { lastT = t; frame(t); });
