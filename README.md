@@ -1,13 +1,34 @@
 # Last Light
 
 A portrait, mobile-first isometric survivors game: a mechanic in a scrap-built rig vs. an alien swarm, one thumb.
-Drag anywhere to steer. The autocannons fire on their own; a stomp and a thermal vent trigger automatically when the swarm closes in.
+Drag anywhere to steer. Everything else is automatic: the **right arm** is the only gun, the **left arm** is a machete arm that swings when bugs get close, and the rig pounds the ground when the swarm closes in.
 Survive until dawn (8:00).
 
 Single static file (`index.html`), no build step, no assets. Sprites are pre-rendered at load by a small software 3D renderer.
 Add `?fps` to the URL for an fps counter.
 
-**Controls:** drag anywhere to steer. Push the stick out to its outer ring (hold the same direction) to dash; it has a cooldown.
+**Controls:** drag anywhere to steer; the dash is its own button (drag it in a direction, or tap). WASD/arrows + Space/Shift + P on keyboard.
+
+## Builds
+
+You pick a **rig** (the right-arm weapon) at the start, then spend level-ups across four **lanes**. Level-ups are slow (about eight in a full night), so each one matters.
+
+| Lane | Basics | Keystones (pick one; the others close) |
+|---|---|---|
+| **GUN** (right arm) | Hot Loads, Quick Feed | **Rotary Cannon** (spin-up gatling, ricochet, Hellstorm) · **Breach Cannon** (scattergun, slugs, Dragon's Breath) · **Burner Torch** (flamethrower, napalm, Conflagration) |
+| **BLADE** (left arm) | Whetstone, Servo Elbow | **Executioner** (heavy chops, executes, Guillotine shockwaves) · **Whirlwind** (full-circle spin, Gyro Drive, Bladestorm) · **Thermal Edge** (burning blade, fire crescents, Sunblade) |
+| **CHASSIS** (legs, engine) | Hydraulic Rams, Fuel Injectors | **Juggernaut** (shoulder-charge dash, Ram Plates, Earthbreaker) · **Skirmisher** (double dash, adrenaline, Phantom Drive) · **Overdrive Core** (automatic redline, Heat Exchange, Meltdown) |
+| **BULWARK** (hull, loot) | Welded Plating, Magnet Rig | **Reactive Armor** (blast on hit, thorns, Bastion) · **Field Repair** (double heal, drones, Second Wind) · **Salvager** (double loot, Pack Rat, Black Market) |
+
+Each keystone has two more steps (a branch upgrade, then a capstone). The level-up screen shows the lane, the tier, and what a keystone closes off; offers lean toward lanes you have invested in. Reroll costs scrap. The pause screen shows your build and what is next in each lane.
+
+## Loot
+
+Bugs drop **scrap** (rerolls, and fuel for Pack Rat), **ammo** crates (gatling and scattergun), **fuel** cans (torch, blade fire, dash, overdrive) and the odd **repair kit**, each with its own silhouette. Drops lean toward what you are running low on. Running dry has consequences: an empty gatling sputters, an empty torch goes out.
+
+## Fire
+
+Flames, jets, burning bugs, muzzle flashes and the hot blade are real light sources: they cut holes in the dark, wash the ground in orange and warm-tint every sprite near them (the rig, bugs, gibs-free props), with shadows pushed away from the nearest fire.
 
 ## Accessibility
 
