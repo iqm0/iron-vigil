@@ -22,6 +22,16 @@ You pick a **rig** (the right-arm weapon) at the start, then spend level-ups acr
 
 Each keystone has two more steps (a branch upgrade, then a capstone). The level-up screen shows the lane, the tier, and what a keystone closes off; offers lean toward lanes you have invested in. Reroll costs scrap. The pause screen shows your build and what is next in each lane.
 
+## Look and clarity
+
+Modelled on what makes Diablo 1/2 (and the D2R remaster's approach of keeping the original mood while adding dynamic light) readable:
+
+- **Darkness makes light meaningful.** Near-black edges, the headlamp cone, and fires as pools of warm light. Each phase of the night has its own palette (scrapyard, hive, last light), like Diablo's per-area palettes.
+- **Quiet ground, loud actors.** The ground is dimmed and tinted so bugs, the rig and pickups carry the contrast. Every bug gets a faint silhouette rim and a minimum brightness so it never vanishes into the black.
+- **Threat tier in the name, Diablo style.** Normal bugs are plain, **elites have a blue ring/halo and a name tag** ("Armored Skitter"), **bosses are gold**. Ring patterns differ by affix as well as colour.
+- **A colour budget.** Fire orange is player and world; **crimson is enemy attacks** (with its own dash pattern per attack type); violet is ambushes, blue is buffs, green is acid; pickups differ by shape.
+- **Fewer numbers.** Only hits of 30+ damage show a number.
+
 ## The night
 
 Eight minutes, scripted, and the bugs are tough: a basic skitter takes about a second of sustained gatling fire, and health scales with time. Every attack is telegraphed on the ground (each hazard type has its own dash pattern, not just a colour), and the attacker is **exposed** (yellow marker, +30% damage taken) after it commits.

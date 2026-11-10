@@ -799,6 +799,7 @@ function spawnLogic(dt) {
   if (!g.demo) while (g.evI < EVENTS.length && t >= EVENTS[g.evI].t) EVENTS[g.evI++].f();
   if (g.surges.length && t >= g.surges[0]) { g.surges.shift(); say(pick(LINES.surge), true); const n = Math.max(4, Math.round((12 + Math.floor(t / 22)) * ST.ecount)), d = spawnDist() + 40; for (let i = 0; i < n; i++) { const a = i / n * TAU; spawnEnemy('skitter', g.x + Math.cos(a) * d, g.y + Math.sin(a) * d); }
     for (let i = 0; i < Math.floor(t / 200); i++) { const [x, y] = ringPos(d); spawnEnemy('ravager', x, y); } g.shake = 6; }
+  if (!g.demo) { if (!g.ph2 && t > 150) { g.ph2 = true; cap('[The nest closes in]'); } if (!g.ph3 && t > 330) { g.ph3 = true; cap('[Last light — the sky burns]'); } }
   if (!g.evacSaid && t > EVAC - 25) { g.evacSaid = true; say(pick(LINES.evac), true); }
 }
 const hashG = new Map(), HC = 56;
@@ -821,7 +822,7 @@ function hurtEnemy(e, d, kx, ky, kb, quiet) {
   if (e.hp <= 0 || e.hidden) return; const g = G, big = e.k === 'ravager'; d *= g.dmgM * (e.arm || 1) * (e.expo ? 1.3 : 1) * (e.burn > 0 && hasS('pyro') ? 1.35 : 1); e.hp -= d;
   if (!quiet) { if (g.t - (e.lf || -9) > .3) { e.flash = .07; e.lf = g.t; } sfx.hit(); e.rx = clamp(e.rx + kx * (big ? 3.5 : 9), -22, 22); e.ry = clamp(e.ry + ky * (big ? 3.5 : 9), -22, 22); e.sq = 1; e.stun = Math.max(e.stun, big ? .04 : .09); if (e.as === 1) e.at = Math.max(0, e.at - .05); spray(e, kx, ky, big ? 2 : 3);
     if (ST.gore && Math.random() < .16 && g.dec.length < 90) g.dec.push({ x: e.x + rand(-8, 8), y: e.y + rand(-8, 8), r: rand(5, 10), t: 16, c: ICHOR_RGB[e.k], corpse: 1 }); }
-  if (kb) { const m = e.t === 'boss' ? .1 : big ? .35 : 1; e.kx += kx * kb * m; e.ky += ky * kb * m; } if (d >= 1 && !quiet) addText(e.x, e.y, Math.round(d), d > 40);
+  if (kb) { const m = e.t === 'boss' ? .1 : big ? .35 : 1; e.kx += kx * kb * m; e.ky += ky * kb * m; } if (d >= 30 && !quiet) addText(e.x, e.y, Math.round(d), d >= 60);
   if (e.hp <= 0) { killEnemy(e, kx, ky); return; }
   const r = e.hp / e.maxhp, st = [.72, .45, .22]; while (e.ripN < 3 && r < st[e.ripN]) { e.ripN++; ripRandom(e, kx, ky); } if (d >= e.maxhp * .3 && e.ripN < 3) { e.ripN++; ripRandom(e, kx, ky); }
 }
@@ -1164,10 +1165,14 @@ function drawMech(X, Y) {
   const drawGun = () => { const sp = gun.spr, x0 = gun.x - sp.ox, y0 = gun.y - sp.oy; ctx.drawImage(sp.c, x0, y0); warmSpr(sp, x0, y0, sp.c.width, sp.c.height, wk); };
   const legs = SP.mech[k][f], tor = SP.torso[tj], tb = -bob * 1.04 * MSC; ctx.drawImage(flash ? flashOf(legs.c) : legs.c, X - legs.ox, Y - legs.oy); warmSpr(legs, X - legs.ox, Y - legs.oy, legs.c.width, legs.c.height, wk);
   if (arm.behind) drawArm(); if (gun.behind) drawGun();
+  if (!ST.contrast) { ctx.globalAlpha = .3; ctx.drawImage(haloOf(tor.c, 'rgba(210,228,255,.9)'), X - tor.ox - 9, Y - tor.oy + tb - 9); ctx.globalAlpha = 1; }
   ctx.drawImage(flash ? flashOf(tor.c) : tor.c, X - tor.ox, Y - tor.oy + tb); warmSpr(tor, X - tor.ox, Y - tor.oy + tb, tor.c.width, tor.c.height, wk);
   if (!gun.behind) drawGun(); if (!arm.behind) drawArm();
   ctx.restore();
 }
+const FLOOR = [];
+const haloCache = new WeakMap();
+function haloOf(c, col) { let m = haloCache.get(c); if (!m) { m = {}; haloCache.set(c, m); } let d = m[col]; if (!d) { const pad = 9; d = document.createElement('canvas'); d.width = c.width + pad * 2; d.height = c.height + pad * 2; const x = d.getContext('2d'); x.shadowColor = col; x.shadowBlur = 6; x.shadowOffsetX = 1000; x.drawImage(c, pad - 1000, pad); x.shadowBlur = 3; x.drawImage(c, pad - 1000, pad); m[col] = d; } return d; }
 const tintCache = new WeakMap();
 function tintOf(c, col) { let m = tintCache.get(c); if (!m) { m = {}; tintCache.set(c, m); } let d = m[col]; if (!d) { d = document.createElement('canvas'); d.width = c.width; d.height = c.height; const x = d.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = col; x.fillRect(0, 0, d.width, d.height); m[col] = d; } return d; }
 const outCache = new WeakMap();
@@ -1176,15 +1181,17 @@ const OFS = [[-2, 0], [2, 0], [0, -2], [0, 2]];
 function drawEnemy(e, X, Y) {
   const big = e.k === 'ravager', set = big ? SP.ravager : SP.skitter, K = big ? RVC_ : SKC, k = e.k8 === undefined ? 0 : e.k8, f = enemyFrame(e), yaw = k * PI4, c_ = Math.cos(yaw), s_ = Math.sin(yaw);
   X += (e.rx - e.ry) * IX; Y += (e.rx + e.ry) * IY; const wk = warmK(X, Y - (big ? 40 : 22)), wsx = wkX, wsy = wkY; const esc = e.sc || 1, sc = e.fuse > 0 ? esc * (1 + .08 * Math.sin(performance.now() / 35) + .22 * (1 - e.fuse / .8)) : esc, sw_ = (big ? 132 : 72) * esc, sh_ = (big ? 56 : 30) * esc; ctx.drawImage(SHADOW, X - sw_ / 2 + wsx * (big ? 14 : 8) * wk, Y - sh_ * .5 + wsy * (big ? 6 : 3.5) * wk, sw_, sh_);
-  if (e.el) { ctx.strokeStyle = e.el === 'armored' ? 'rgba(210,220,235,.85)' : e.el === 'frenzied' ? 'rgba(255,80,60,.85)' : 'rgba(255,170,40,.9)'; ctx.lineWidth = ST.contrast ? 4 : 2.5; ctx.setLineDash(e.el === 'armored' ? [] : e.el === 'frenzied' ? [3, 4] : [10, 5]); ell(X, Y, e.r * 1.5, e.r * .75); ctx.stroke(); ctx.setLineDash([]); }
+  if (e.el || e.t === 'boss') { ctx.strokeStyle = e.t === 'boss' ? 'rgba(255,200,90,.9)' : 'rgba(120,165,255,.9)'; ctx.lineWidth = ST.contrast ? 4 : 2.5; ctx.setLineDash(e.t === 'boss' || e.el === 'armored' ? [] : e.el === 'frenzied' ? [3, 4] : [10, 5]); ell(X, Y, e.r * 1.5, e.r * .75); ctx.stroke(); ctx.setLineDash([]); }
   const squash = e.sq > .02 || sc !== 1; if (squash) { ctx.save(); ctx.translate(X, Y); ctx.scale((1 + .1 * e.sq) * sc, (1 - .13 * e.sq) * sc); ctx.translate(-X, -Y); }
   const fl = e.flash > 0 && !ST.flash, near = sg => (K.cx * (c_ + s_) + sg * K.cz * (c_ - s_)) > 0, tailNear = -(c_ + s_) > 0, L = !(e.lost & 1), R_ = !(e.lost & 2), T_ = !(e.lost & 4), parts = [];
   if (T_ && !tailNear) parts.push(set.tail[k][f]); if (L && !near(-1)) parts.push(set.scL[k][f]); if (R_ && !near(1)) parts.push(set.scR[k][f]); parts.push(set.body[k][f]);
   if (T_ && tailNear) parts.push(set.tail[k][f]); if (L && near(-1)) parts.push(set.scL[k][f]); if (R_ && near(1)) parts.push(set.scR[k][f]);
+  { const bd = set.body[k][f]; if (bd && bd.c.width > 1 && !ST.contrast) { const tier = e.t === 'boss' ? 2 : e.el ? 1 : 0, rc = tier === 2 ? 'rgba(255,200,90,.95)' : tier === 1 ? 'rgba(110,160,255,.95)' : 'rgba(200,212,235,.9)'; ctx.globalAlpha = tier === 2 ? .85 : tier === 1 ? .75 : .34 + (e.expo ? .3 : 0); ctx.drawImage(haloOf(bd.c, rc), X - bd.ox - 9, Y - bd.oy - 9); ctx.globalAlpha = 1; } if (bd && bd.c.width > 1) FLOOR.push(bd.c, X + (-bd.ox) * sc, Y + (-bd.oy) * sc, bd.c.width * sc, bd.c.height * sc, e.t === 'boss' ? .55 : e.el ? .42 : e.expo ? .4 : .26, e.tint); }
   if (ST.contrast) for (const sp of parts) if (sp && sp.c.width > 1) { const o = outlineOf(sp.c); for (const [ox, oy] of OFS) ctx.drawImage(o, X - sp.ox + ox, Y - sp.oy + oy); }
   for (const sp of parts) if (sp && sp.c.width > 1) { ctx.drawImage(fl ? flashOf(sp.c) : e.tint ? tintOf(sp.c, e.tint) : sp.c, X - sp.ox, Y - sp.oy); if (wk > .04) warmSpr(sp, X - sp.ox, Y - sp.oy, sp.c.width, sp.c.height, wk); }
   if (squash) ctx.restore();
   if (e.expo) { const yy = Y - (big ? 118 : 70) * esc - 6, bob = Math.sin(performance.now() / 120) * 2; ctx.fillStyle = '#ffd24a'; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X - 6, yy + bob); ctx.lineTo(X + 6, yy + bob); ctx.lineTo(X, yy + 9 + bob); ctx.closePath(); ctx.stroke(); ctx.fill(); }
+  if (e.el) { const nm = ELITES[e.el].n + ' ' + (VT[e.t].n || 'Skitter'), ny = Y - (big ? 128 : 74) * esc - 7; ctx.font = `bold ${Math.round(13 * ST.text)}px Georgia,serif`; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.92)'; ctx.strokeText(nm, X, ny); ctx.fillStyle = '#8fb4ff'; ctx.fillText(nm, X, ny); }
   if (e.hp < e.maxhp && e.t !== 'boss') { const w = (big ? 56 : 26) * Math.max(1, esc * .9), yy = Y - (big ? 128 : 74) * esc; ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(X - w / 2 - 1, yy - 1, w + 2, 4.5); ctx.fillStyle = e.rage ? '#d03a22' : big ? '#9a3a22' : '#b84a2a'; ctx.fillRect(X - w / 2, yy, w * e.hp / e.maxhp, 2.5); }
 }
 function drawGib(q, X, Y) {
@@ -1201,6 +1208,9 @@ function pkIcon(kd) { let c = PKI[kd]; if (c) return c; c = PKI[kd] = document.c
   else if (kd === 'fuel') { x.fillStyle = '#c4521f'; x.fillRect(-5, -5, 10, 11); x.strokeRect(-5, -5, 10, 11); x.fillStyle = '#5c2810'; x.fillRect(-2, -8.5, 4, 3.5); x.strokeRect(-2, -8.5, 4, 3.5); x.strokeStyle = '#f0a070'; x.beginPath(); x.moveTo(-5, -5); x.lineTo(5, 6); x.moveTo(5, -5); x.lineTo(-5, 6); x.stroke(); }
   else { x.fillStyle = '#e8efe0'; x.fillRect(-6, -6, 12, 12); x.strokeRect(-6, -6, 12, 12); x.fillStyle = '#2e9e3c'; x.fillRect(-1.9, -4.6, 3.8, 9.2); x.fillRect(-4.6, -1.9, 9.2, 3.8); }
   return c; }
+const BIOMES = [{ g: [14, 20, 30], ga: .30, a: [4, 9, 17] }, { g: [28, 14, 40], ga: .28, a: [10, 6, 17] }, { g: [60, 28, 18], ga: .26, a: [24, 12, 12] }];
+function biome(t) { const u = clamp((t - 150) / 50, 0, 1), v = clamp((t - 330) / 60, 0, 1), A = BIOMES[0], B = BIOMES[1], C = BIOMES[2], mix = (p, q, k) => [lerp(p[0], q[0], k), lerp(p[1], q[1], k), lerp(p[2], q[2], k)], g1 = mix(A.g, B.g, u), a1 = mix(A.a, B.a, u);
+  return { g: mix(g1, C.g, v).map(Math.round), ga: lerp(lerp(A.ga, B.ga, u), C.ga, v), a: mix(a1, C.a, v).map(Math.round) }; }
 function render() {
   Z = Zb * zoomK; const g = G, t = performance.now() / 1000, lowfx = Q <= .7; frameNo++;
   camSX = (g.cx - g.cy) * IX + (Math.random() - .5) * g.shake * ST.shake; camSY = (g.cx + g.cy) * IY + (Math.random() - .5) * g.shake * ST.shake + g.bump * 3 * ST.shake;
@@ -1209,13 +1219,15 @@ function render() {
   const cs = [[-hw, -hhT], [hw, -hhT], [hw, hhB], [-hw, hhB]].map(([a, b]) => { const u = (a + camSX) / IX, v = (b + camSY) / IY; return [(u + v) / 2, (v - u) / 2]; });
   const minx = Math.min(cs[0][0], cs[1][0], cs[2][0], cs[3][0]), maxx = Math.max(cs[0][0], cs[1][0], cs[2][0], cs[3][0]), miny = Math.min(cs[0][1], cs[1][1], cs[2][1], cs[3][1]), maxy = Math.max(cs[0][1], cs[1][1], cs[2][1], cs[3][1]);
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.setTransform(RS * Z, 0, 0, RS * Z, RS * OX, RS * OY); lights.length = 0; fireDecor.length = 0; eL.length = 0; warm.length = 0;
+  ctx.setTransform(RS * Z, 0, 0, RS * Z, RS * OX, RS * OY); lights.length = 0; fireDecor.length = 0; eL.length = 0; warm.length = 0; FLOOR.length = 0;
   // ground chunks (only those whose diamond touches the screen; prefetch a margin)
   { const SZ = CH + 2 * GP, need = []; for (let i = Math.floor(minx / CH) - 1; i <= Math.floor(maxx / CH) + 1; i++) for (let j = Math.floor(miny / CH) - 1; j <= Math.floor(maxy / CH) + 1; j++) {
       const l = (i * CH - j * CH - SZ) * IX - camSX, tp = (i * CH + j * CH - 2 * GP) * IY - camSY, w = 2 * SZ * IX, h = 2 * SZ * IY;
       if (l > hw + 340 || l + w < -hw - 340 || tp > hhB + 340 || tp + h < -hhT - 340) continue; const c = getChunk(i, j), vis = !(l > hw || l + w < -hw || tp > hhB || tp + h < -hhT);
       if (vis) { need.push(c); if (c.ready) ctx.drawImage(c.cv, c.left - camSX, c.top - camSY, c.w, c.h); } }
     pumpChunks(need.some(c => !c.ready) ? 3 : 1); }
+  // quiet the ground (value and saturation) so actors read first, and tint it by the phase of the night: scrapyard, hive, last light
+  { const bp = biome(g.t); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(${bp.g[0]},${bp.g[1]},${bp.g[2]},${bp.ga})`; ctx.fillRect(0, 0, cv.width, cv.height); ctx.setTransform(RS * Z, 0, 0, RS * Z, RS * OX, RS * OY); }
   // decals (scorch + corpses)
   for (const d of g.dec) { const X = SX(d.x, d.y), Y = SY(d.x, d.y); ctx.fillStyle = d.corpse ? `rgba(${d.c},${.55 * Math.min(1, d.t / 5)})` : `rgba(0,0,0,${.5 * Math.min(1, d.t / 3)})`; ell(X, Y, d.r * 1.15, d.r * .58); ctx.fill(); }
   for (const f of g.fire) { const X = SX(f.x, f.y), Y = SY(f.x, f.y), k = Math.min(1, f.life / 1.2); ctx.fillStyle = `rgba(10,2,0,${.28 * k})`; ell(X, Y, f.r * 1.05, f.r * .52); ctx.fill(); lights.push(X, Y - 6, f.r * 2.6, .95 * k, 0); warm.push(X, Y, f.r * 3.4, .95 * k); }
@@ -1241,8 +1253,8 @@ function render() {
     if (o._k === 'e') { if (!o.hidden) { drawEnemy(o, X, Y); eL.push(X, Y); } } else if (o._k === 'p0') drawMech(X, Y); else if (o._k === 'g') drawGib(o, X, Y); else if (o._k === 'c') drawCorpse(o, X, Y); else drawProp(o, X, Y);
   }
   // ---- lighting: near-black ambient with holes for light sources
-  const px = SX(g.x, g.y), py = SY(g.x, g.y), ls = RS * .5, ambA = lerp(.84, .6, prog * prog) * (1 - .6 * ST.bright - (ST.contrast ? .12 : 0)), dw = prog * prog;
-  lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = 'source-over'; lx.clearRect(0, 0, lc.width, lc.height); lx.fillStyle = `rgba(${Math.round(lerp(3, 52, dw))},${Math.round(lerp(4, 32, dw))},${Math.round(lerp(9, 26, dw))},${ambA})`; lx.fillRect(0, 0, lc.width, lc.height);
+  const px = SX(g.x, g.y), py = SY(g.x, g.y), ls = RS * .5, ambA = lerp(.74, .58, prog * prog) * (1 - .6 * ST.bright - (ST.contrast ? .12 : 0)), dw = prog * prog, bm = biome(g.t).a;
+  lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = 'source-over'; lx.clearRect(0, 0, lc.width, lc.height); lx.fillStyle = `rgba(${Math.round(lerp(bm[0], 52, dw * .6))},${Math.round(lerp(bm[1], 32, dw * .6))},${Math.round(lerp(bm[2], 26, dw * .6))},${ambA})`; lx.fillRect(0, 0, lc.width, lc.height);
   lx.setTransform(ls * Z, 0, 0, ls * Z, ls * OX, ls * OY); lx.globalCompositeOperation = 'destination-out';
   const fa = Math.atan2(Math.sin(g.faceA) / .55, Math.cos(g.faceA)), lampP = pl(16, 94 + mechBob(mechFrame()), 0, g.tj * TAU / 16, MSC), lampX = px + lampP[0], lampY = py + lampP[1];
   lx.save(); lx.translate(lampX, lampY); lx.scale(1, .55); lx.rotate(fa); lx.drawImage(CONE, 0, -540, 1080, 1080); lx.restore();
@@ -1251,6 +1263,8 @@ function render() {
   for (const s of g.sw) { const u = s.t / s.dur, X = SX(s.x, s.y), Y = SY(s.x, s.y), r = s.r * 2 * (1 - (1 - u) * (1 - u)) + 50; lx.globalAlpha = 1 - u; lx.drawImage(GL.w, X - r, Y - r * .6, r * 2, r * 1.2); }
   lx.globalAlpha = 1; lx.globalCompositeOperation = 'source-over';
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(lc, 0, 0, cv.width, cv.height); ctx.setTransform(RS * Z, 0, 0, RS * Z, RS * OX, RS * OY);
+  // actor floor: bugs never fall fully into the dark (Diablo's far monsters stay readable as shapes)
+  for (let i = 0; i < FLOOR.length; i += 7) { ctx.globalAlpha = FLOOR[i + 5]; ctx.drawImage(FLOOR[i + 6] ? tintOf(FLOOR[i], FLOOR[i + 6]) : FLOOR[i], FLOOR[i + 1], FLOOR[i + 2], FLOOR[i + 3], FLOOR[i + 4]); } ctx.globalAlpha = 1;
   // ---- emissive layer (unaffected by darkness)
   ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < lights.length; i += 5) { const r = lights[i + 2], wm = lights[i + 4] === 0; glowE(LCOL[lights[i + 4]], lights[i], lights[i + 1] + 8, r * (wm ? 1 : .8), r * (wm ? .58 : .45), (wm ? .34 : .16) * lights[i + 3]); }
@@ -1266,7 +1280,7 @@ function render() {
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   if (g.gt === 'tch' && !g.jetOn) { const [mx_, my_] = muzzleWorld(), X = SX(mx_, my_), Y = SY(mx_, my_) - MUZ_H; ctx.globalCompositeOperation = 'lighter'; glow(GL.o, X, Y, 14, .5); fireAt(X, Y + 3, .2, t, 1); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
   // hazards: every enemy attack is marked on the ground, with its own dash pattern as well as colour
-  for (const h of g.hz) { const X = SX(h.x, h.y), Y = SY(h.x, h.y), u = clamp(h.t / h.T, 0, 1), cols = h.k === 'shriek' ? '120,170,255' : h.k === 'emerge' ? '215,160,90' : h.k === 'bile' ? '150,255,70' : '255,70,40', dash = h.k === 'shriek' ? [3, 6] : h.k === 'emerge' ? [2, 5] : h.k === 'bile' ? [6, 4] : [12, 7];
+  for (const h of g.hz) { const X = SX(h.x, h.y), Y = SY(h.x, h.y), u = clamp(h.t / h.T, 0, 1), cols = h.k === 'shriek' ? '120,170,255' : h.k === 'emerge' ? '185,120,255' : h.k === 'bile' ? '150,255,70' : '235,40,85', dash = h.k === 'shriek' ? [3, 6] : h.k === 'emerge' ? [2, 5] : h.k === 'bile' ? [6, 4] : [12, 7];
     ctx.strokeStyle = ST.contrast ? `rgba(255,255,255,${.6 + .4 * u})` : `rgba(${cols},${.35 + .55 * u})`; ctx.lineWidth = ST.contrast ? 4 : 2.5; ctx.setLineDash(dash); ell(X, Y, h.r * 1.2, h.r * .6); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = `rgba(${cols},${.06 + .16 * u})`; ell(X, Y, h.r * 1.2 * u, h.r * .6 * u); ctx.fill(); }
   // acid (always visible)
   for (const a of g.ac) { const X = SX(a.tx, a.ty), Y = SY(a.tx, a.ty);
@@ -1283,11 +1297,11 @@ function render() {
   if (READY) for (const e of g.en) { if (e.hidden) continue; let X = SX(e.x, e.y), Y = SY(e.x, e.y); if (X < -hw || X > hw || Y < -hhT || Y > hhB) continue; X += (e.rx - e.ry) * IX; Y += (e.rx + e.ry) * IY; const yaw = (e.k8 || 0) * PI4, big = e.k === 'ravager', K = big ? RVC_ : SKC;
     if (e.burn > 0) { glow(GL.o, X, Y - 34, 26, .35); ctx.globalAlpha = 1; fireAt(X, Y - 8, big ? .8 : .5, t, e.id); }
     if (e.rage) { glow(GL.r, X, Y - (big ? 40 : 24), big ? 52 : 30, .3 + .1 * Math.sin(t * 9 + e.id)); ctx.globalAlpha = 1; }
-    if (e.mv === 'pw') { const x2 = e.x + e.ldx * 230, y2 = e.y + e.ldy * 230; ctx.strokeStyle = ST.contrast ? 'rgba(255,255,255,.7)' : 'rgba(255,70,50,.3)'; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(SX(e.x, e.y), SY(e.x, e.y)); ctx.lineTo(SX(x2, y2), SY(x2, y2)); ctx.stroke(); ctx.strokeStyle = ST.contrast ? '#fff' : 'rgba(255,130,100,.85)'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.stroke(); ctx.setLineDash([]); }
+    if (e.mv === 'pw') { const x2 = e.x + e.ldx * 230, y2 = e.y + e.ldy * 230; ctx.strokeStyle = ST.contrast ? 'rgba(255,255,255,.7)' : 'rgba(235,40,85,.3)'; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(SX(e.x, e.y), SY(e.x, e.y)); ctx.lineTo(SX(x2, y2), SY(x2, y2)); ctx.stroke(); ctx.strokeStyle = ST.contrast ? '#fff' : 'rgba(255,120,150,.85)'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.stroke(); ctx.setLineDash([]); }
     if (e.buff > 0) { glow(GL.c, X, Y - (big ? 40 : 24), big ? 52 : 32, .35 + .1 * Math.sin(t * 8 + e.id)); ctx.globalAlpha = 1; }
-    if (e.fuse > 0) { const u = 1 - e.fuse / .8; ctx.strokeStyle = ST.contrast ? `rgba(255,255,255,${.6 + .4 * u})` : `rgba(255,120,40,${.35 + .6 * u})`; ctx.lineWidth = ST.contrast ? 4 : 2.5; ctx.setLineDash([8, 6]); ell(X, Y, 100 * 1.2, 100 * .6); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = `rgba(255,90,30,${.08 + .14 * u})`; ell(X, Y, 100 * 1.2 * u, 100 * .6 * u); ctx.fill(); }
-    if (e.bs === 'tele') { const x2 = e.x + Math.cos(e.cA) * 650, y2 = e.y + Math.sin(e.cA) * 650; ctx.lineCap = 'butt'; ctx.strokeStyle = ST.contrast ? 'rgba(255,255,255,.55)' : 'rgba(255,60,40,.28)'; ctx.lineWidth = 46; ctx.beginPath(); ctx.moveTo(SX(e.x, e.y), SY(e.x, e.y)); ctx.lineTo(SX(x2, y2), SY(x2, y2)); ctx.stroke(); ctx.strokeStyle = ST.contrast ? '#fff' : 'rgba(255,120,90,.8)'; ctx.lineWidth = 3; ctx.setLineDash([14, 10]); ctx.stroke(); ctx.setLineDash([]); }
-    if (e.as === 1) { const u = e.at / ((big ? .6 : .32) / (e.rage ? 1.3 : 1)); ctx.strokeStyle = ST.contrast ? `rgba(255,255,255,${.5 + .5 * Math.min(1, u)})` : `rgba(255,80,40,${.25 + .6 * Math.min(1, u)})`; ctx.lineWidth = ST.contrast ? 4 : 2.5; ell(X, Y, (e.reach + 6) * 1.2, (e.reach + 6) * .6); ctx.stroke(); ctx.lineWidth = 1.5; ell(X, Y, (e.reach + 6) * .8, (e.reach + 6) * .4); ctx.stroke(); ctx.fillStyle = `rgba(255,60,30,${.08 * Math.min(1, u)})`; ctx.fill(); }
+    if (e.fuse > 0) { const u = 1 - e.fuse / .8; ctx.strokeStyle = ST.contrast ? `rgba(255,255,255,${.6 + .4 * u})` : `rgba(235,40,85,${.35 + .6 * u})`; ctx.lineWidth = ST.contrast ? 4 : 2.5; ctx.setLineDash([8, 6]); ell(X, Y, 100 * 1.2, 100 * .6); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = `rgba(235,40,85,${.08 + .14 * u})`; ell(X, Y, 100 * 1.2 * u, 100 * .6 * u); ctx.fill(); }
+    if (e.bs === 'tele') { const x2 = e.x + Math.cos(e.cA) * 650, y2 = e.y + Math.sin(e.cA) * 650; ctx.lineCap = 'butt'; ctx.strokeStyle = ST.contrast ? 'rgba(255,255,255,.55)' : 'rgba(235,40,85,.28)'; ctx.lineWidth = 46; ctx.beginPath(); ctx.moveTo(SX(e.x, e.y), SY(e.x, e.y)); ctx.lineTo(SX(x2, y2), SY(x2, y2)); ctx.stroke(); ctx.strokeStyle = ST.contrast ? '#fff' : 'rgba(255,120,150,.8)'; ctx.lineWidth = 3; ctx.setLineDash([14, 10]); ctx.stroke(); ctx.setLineDash([]); }
+    if (e.as === 1) { const u = e.at / ((big ? .6 : .32) / (e.rage ? 1.3 : 1)); ctx.strokeStyle = ST.contrast ? `rgba(255,255,255,${.5 + .5 * Math.min(1, u)})` : `rgba(235,40,85,${.25 + .6 * Math.min(1, u)})`; ctx.lineWidth = ST.contrast ? 4 : 2.5; ell(X, Y, (e.reach + 6) * 1.2, (e.reach + 6) * .6); ctx.stroke(); ctx.lineWidth = 1.5; ell(X, Y, (e.reach + 6) * .8, (e.reach + 6) * .4); ctx.stroke(); ctx.fillStyle = `rgba(235,40,85,${.08 * Math.min(1, u)})`; ctx.fill(); }
     if (e.as === 0) {
       if (!big) { for (const q of SK_EYE) { const p = pl(q[0], q[1], q[2], yaw, K.sc * (e.sc || 1)); glow(e.rage ? GL.r : e.t === 'spitter' ? GL.g : GL.o, X + p[0], Y + p[1], e.rage ? 9 : 6, .7); ctx.fillStyle = e.rage ? 'rgba(255,120,100,.95)' : 'rgba(255,170,90,.95)'; ctx.fillRect(X + p[0] - 1, Y + p[1] - 1, 2, 2); } ctx.globalAlpha = 1; }
       else { const pul = e.chg > 0 ? 1 : .55 + .25 * Math.sin(t * 3 + e.ph); for (const q of RV_SAC) { const p = pl(q[0], q[1], q[2], yaw, K.sc * (e.sc || 1)); glow(GL.g, X + p[0], Y + p[1], 28, .5 * pul); } const m = pl(RV_MOUTH[0], RV_MOUTH[1], RV_MOUTH[2], yaw, K.sc * (e.sc || 1)); glow(GL.g, X + m[0], Y + m[1], 12, .8); ctx.globalAlpha = 1; }
