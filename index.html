@@ -161,7 +161,7 @@ let Zb = 1, zoomK = 1, W = 0, H = 0, RS = 1, Q = (window.devicePixelRatio || 1) 
 const DPR0 = Math.min(window.devicePixelRatio || 1, 2);
 const IX = .85, IY = .425, TAU = Math.PI * 2, PI4 = Math.PI / 4;
 const HAB = { x: 250, y: -340 };
-const EVAC = 480, CAP = 70, MSC = 1.25, MUZ_H = 66;
+const EVAC = 480, CAP = 34, MSC = 1.25, MUZ_H = 66;
 let vigC, redC, fogC;
 
 function resize() {
@@ -280,7 +280,7 @@ function texEval(code, x, y, z) {
   else if (code === 3) t = Math.floor((x + y + z) / 4) & 1; else if (code === 4) { t = Math.floor((x + z) / 3) & 1; mu = t ? .8 : 1; } else if (code === 5) mu = .84 + .32 * vn((x + z) * .9, y * 2.4);
   _tx.t = t; _tx.mu = mu;
 }
-function rasterTris(tris, yaw, S, ox, oy, sc, aoH, ss) {
+function rasterCore(tris, yaw, S, ox, oy, sc, aoH, ss) {
   ss = ss || 1.5; const N = Math.round(S * ss), ox2 = ox * ss, oy2 = oy * ss, sc2 = sc * ss, cy_ = Math.cos(yaw), sy_ = Math.sin(yaw), nT = tris.length;
   const Tid = new Int32Array(N * N).fill(-1), Zb = new Float32Array(N * N).fill(-1e9), B0 = new Float32Array(N * N), B1 = new Float32Array(N * N); let bx0 = N, bx1 = 0, by0 = N, by1 = 0;
   for (let ti = 0; ti < nT; ti++) {
@@ -322,8 +322,20 @@ function rasterTris(tris, yaw, S, ox, oy, sc, aoH, ss) {
   const fx0 = Math.max(0, Math.floor(bx0 / ss) - 1), fy0 = Math.max(0, Math.floor(by0 / ss) - 1), fx1 = Math.min(S - 1, Math.ceil(bx1 / ss) + 1), fy1 = Math.min(S - 1, Math.ceil(by1 / ss) + 1), w = fx1 - fx0 + 1, h = fy1 - fy0 + 1;
   const out = document.createElement('canvas'); out.width = w; out.height = h; const oc = out.getContext('2d'); oc.imageSmoothingQuality = 'high'; oc.drawImage(hi, fx0 * ss, fy0 * ss, w * ss, h * ss, 0, 0, w, h); return { c: out, ox: ox - fx0, oy: oy - fy0 };
 }
+let BS = 1, CG = 1;   // bake scale, colour gain
+// (CG lifts bug sprites so they separate from the dark ground): sprites are rendered at (about) screen resolution so they are never stretched
+const mkSpr = (c, oxHi, oyHi) => ({ c, ox: oxHi / BS, oy: oyHi / BS, w: c.width / BS, h: c.height / BS });
+function crisp(c) {   // hard silhouette, light sharpen, 1px dark outline: pixel-clear instead of soft
+  const w = c.width, h = c.height, x = c.getContext('2d'), im = x.getImageData(0, 0, w, h), d = im.data, src = new Uint8ClampedArray(d), a0 = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) a0[i] = src[i * 4 + 3] < 120 ? 0 : 1;
+  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { const i = y * w + xx, o = i * 4;
+    if (a0[i]) { let r = 0, g = 0, b = 0, n = 0; for (const j of [i - 1, i + 1, i - w, i + w]) { if (j < 0 || j >= w * h || !a0[j]) continue; r += src[j * 4]; g += src[j * 4 + 1]; b += src[j * 4 + 2]; n++; }
+      if (n) { r /= n; g /= n; b /= n; d[o] = clamp((src[o] + .7 * (src[o] - r)) * CG, 0, 255); d[o + 1] = clamp((src[o + 1] + .7 * (src[o + 1] - g)) * CG, 0, 255); d[o + 2] = clamp((src[o + 2] + .7 * (src[o + 2] - b)) * CG, 0, 255); } else { d[o] = clamp(src[o] * CG, 0, 255); d[o + 1] = clamp(src[o + 1] * CG, 0, 255); d[o + 2] = clamp(src[o + 2] * CG, 0, 255); } d[o + 3] = 255; }
+    else { const e = (xx > 0 && a0[i - 1]) || (xx < w - 1 && a0[i + 1]) || (y > 0 && a0[i - w]) || (y < h - 1 && a0[i + w]); if (e) { d[o] = 12; d[o + 1] = 9; d[o + 2] = 12; d[o + 3] = 255; } else d[o + 3] = 0; } }
+  x.putImageData(im, 0, 0); return c; }
+function rasterTris(tris, yaw, S, ox, oy, sc, aoH, ss) { const r = rasterCore(tris, yaw, Math.round(S * BS), ox * BS, oy * BS, sc * BS, aoH, ss); return mkSpr(crisp(r.c), r.ox, r.oy); }
 function bakeStatic(tris, S, sc, aoH, yaw) { return rasterTris(tris, yaw || 0, S, S / 2, S * .72, sc, aoH, 2); }
-function flipSpr(sp) { const w = sp.c.width, h = sp.c.height, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.translate(w, 0); x.scale(-1, 1); x.drawImage(sp.c, 0, 0); return { c, ox: w - sp.ox, oy: sp.oy }; }
+function flipSpr(sp) { const w = sp.c.width, h = sp.c.height, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.translate(w, 0); x.scale(-1, 1); x.drawImage(sp.c, 0, 0); return { c, ox: sp.w - sp.ox, oy: sp.oy, w: sp.w, h: sp.h }; }
 function pl(x, y, z, yaw, sc) { const c = Math.cos(yaw), s = Math.sin(yaw), xr = x * c - z * s, zr = x * s + z * c; return [(xr - zr) * IX * sc, (xr + zr) * IY * sc - y * 1.04 * sc]; }
 const flashCache = new WeakMap();
 function flashOf(c) { let f = flashCache.get(c); if (!f) { f = document.createElement('canvas'); f.width = c.width; f.height = c.height; const x = f.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(255,238,220,.6)'; x.fillRect(0, 0, f.width, f.height); flashCache.set(c, f); } return f; }
@@ -368,7 +380,7 @@ function mechLegs(f) {
   const M = [], idle = f === 8, ph = idle ? 0 : f / 8, bob = mechBob(f), hipY = 40 + bob, tw = idle ? 0 : Math.sin(ph * TAU) * .07, rl = idle ? 0 : Math.sin(ph * TAU) * .04, ln = idle ? 0 : -.05;
   for (const s of [-1, 1]) {
     const [fx, lift] = idle ? [0, 0] : gait(ph + (s > 0 ? .5 : 0), 14, 11), hip = [0, hipY, s * 15], foot = [fx + 3, 7 + lift, s * 17], knee = ik2(hip, foot, 25, 25, [1, .25, 0]);
-    cyl(M, hip, knee, 9, 7.5, M_RPD, 10); ellip(M, hip[0], hip[1], hip[2], 10, 10, 10, M_MET, 10, 7); slab(M, knee[0] + 3, knee[1] - 7, knee[2], 8, 8.5, 14, 2.5, M_RPT); cyl(M, knee, foot, 6.8, 5.5, M_GRY, 9); ellip(M, knee[0], knee[1], knee[2], 6.2, 6.2, 6.2, M_MET, 8, 6);
+    cyl(M, hip, knee, 9, 7.5, M_RPD, 10); ellip(M, hip[0], hip[1], hip[2], 10, 10, 10, M_MET, 10, 7); slab(M, knee[0] + 3, knee[1] - 6, knee[2], 6.2, 6.6, 11, 2, M_OLV); cyl(M, knee, foot, 6.8, 5.5, M_GRY, 9); ellip(M, knee[0], knee[1], knee[2], 6.2, 6.2, 6.2, M_MET, 8, 6);
     const pm = V3.add(V3.mul(V3.add(knee, foot), .5), [-5, 3, s * 5]); cyl(M, [hip[0] + 7, hip[1] - 5, hip[2] + s * 8], pm, 2.3, 2.3, M_MET, 6); cyl(M, pm, V3.add(pm, V3.mul(V3.norm(V3.sub(pm, [hip[0] + 7, hip[1] - 5, hip[2] + s * 8])), 9)), 1.5, 1.5, M_GRY, 5);
     ellip(M, foot[0], foot[1] + 1, foot[2], 6, 6, 6, M_MET, 8, 5); slab(M, foot[0] + 5, foot[1] - 7, foot[2], 12, 8.5, 8, 3, M_RPD); slab(M, foot[0] + 16, foot[1] - 7.5, foot[2], 3.4, 7.4, 5.5, 1.5, M_MET); slab(M, foot[0] - 9, foot[1] - 7, foot[2], 3.4, 7, 7, 1.5, M_MET);
   }
@@ -376,18 +388,17 @@ function mechLegs(f) {
   return M;
 }
 function mechTorso() {
-  const M = [], hipY = 40, y0 = hipY + 6;
-    slab(M, 0, y0, 0, 20, 23, 22, 4, M_RPT, [17, 21]); slab(M, 17, y0 + 3, 0, 4, 19, 16, 2, M_OLV); slab(M, 21.2, y0 + 5, 0, 1, 20, 3.4, .6, M_HAZ);
-    for (const z of [-1, 1]) { slab(M, 1, y0 + 4, z * 23.8, 13, 2, 14, 1, z < 0 ? M_GRY : M_OLV); slab(M, -9, y0 + 12, z * 24.2, 7, 1.6, 7, .8, M_RPD); }
-    slab(M, -19, y0 + 2, 0, 9, 19, 20, 3, M_RPD, [8, 18]); for (let i = 0; i < 5; i++) slab(M, -28.4, y0 + 5 + i * 3, 0, .8, 15, 1.2, .3, M_MET);
-    cyl(M, [-33, y0 + 14, 0], [-27, y0 + 14, 0], 13, 13, M_TRD, 14); cyl(M, [-33.6, y0 + 14, 0], [-31, y0 + 14, 0], 5, 5, M_MET, 10);
-    for (const z of [-10, 10]) { cyl(M, [-19, y0 + 20, z], [-19, y0 + 58, z], 3.2, 2.8, M_MET, 8); cyl(M, [-19, y0 + 58, z], [-19, y0 + 60.5, z], 4, 4, M_BURN, 8); }
-    slab(M, -3, y0 + 22, 0, 8, 9, 3, .8, M_RPD); slab(M, 1, y0 + 25, 0, 5, 7, 9, 2, M_OVER); ellip(M, 1.5, y0 + 38, 0, 4.2, 4.6, 4.2, M_SKIN, 9, 6); ellip(M, 1.5, y0 + 41.2, 0, 5, 3, 5, M_CAP, 9, 5); slab(M, 5.5, y0 + 39.4, 0, 1.4, 4.4, 1.4, .4, M_CAP);
-    for (const z of [-1, 1]) { slab(M, 6, y0 + 36.6, z * 2.2, .7, 1.5, 1.8, .3, M_GLASS); cyl(M, [1, y0 + 31, z * 5], [9, y0 + 27.5, z * 3.2], 1.8, 1.6, M_OVER, 5); }
-    for (const z of [-1, 1]) { cyl(M, [12, y0 + 22, z * 15], [10, y0 + 44, z * 12], 1.4, 1.4, M_MET, 6); cyl(M, [-7, y0 + 22, z * 15], [-5, y0 + 44, z * 12], 1.4, 1.4, M_MET, 6); cyl(M, [10, y0 + 44, z * 12], [-5, y0 + 44, z * 12], 1.3, 1.3, M_MET, 6); cyl(M, [12, y0 + 22, z * 15], [-5, y0 + 44, z * 12], 1, 1, M_MET, 5); }
-    cyl(M, [10, y0 + 44, -12], [10, y0 + 44, 12], 1.3, 1.3, M_MET, 6); cyl(M, [-5, y0 + 44, -12], [-5, y0 + 44, 12], 1.3, 1.3, M_MET, 6); slab(M, 2.5, y0 + 44, 0, 11, 13, 2, .6, M_GRY);
-    cyl(M, [6, y0 + 49, 0], [17, y0 + 49, 0], 5.5, 5.5, M_MET, 10); cyl(M, [17, y0 + 49, 0], [18.6, y0 + 49, 0], 4.6, 4.6, M_LAMP, 10); cyl(M, [3, y0 + 46, 0], [6, y0 + 49, 0], 2, 2, M_MET, 5);
-    for (const z of [-1, 1]) { slab(M, -1, y0 + 8, z * 27, 12, 8, 14, 2.5, M_OLV, [10, 7]); ellip(M, 0, y0 + 16, z * 30, 8, 8, 8, M_MET, 9, 6); }
+  const M = [], y0 = 46;
+  slab(M, 0, y0 - 2, 0, 14, 18, 10, 3, M_GRY, [13, 17]);                                   // waist
+  slab(M, 1, y0 + 7, 0, 19, 24, 22, 4, M_RPT, [16, 21]);                                   // chest block
+  slab(M, 18, y0 + 9, 0, 3.4, 20, 17, 1.6, M_OLV); slab(M, 21, y0 + 11, 0, .9, 20.5, 3.2, .5, M_HAZ);   // front plate, hazard strip
+  for (const z of [-1, 1]) { slab(M, 0, y0 + 9, z * 24.6, 12, 1.8, 13, .8, M_GRY); slab(M, -8, y0 + 18, z * 24.8, 6, 1.4, 5, .6, M_RPD); slab(M, 0, y0 + 20, z * 28.5, 12, 8.5, 6, 2.2, M_OLV, [11, 7.5]); ellip(M, 0, y0 + 15, z * 27, 7, 7, 5, M_MET, 9, 5); }   // side intakes, pauldrons
+  slab(M, 3, y0 + 28, 0, 11, 13, 12, 3, M_RPD, [9, 11]); slab(M, 12.3, y0 + 30, 0, .9, 9, 7, .4, M_GLASS);   // cab + window
+  ellip(M, 2.5, y0 + 36.5, 0, 4, 4.4, 4, M_SKIN, 9, 6); ellip(M, 2.5, y0 + 39.5, 0, 4.6, 2.6, 4.6, M_CAP, 9, 5);   // pilot
+  slab(M, 6, y0 + 40, 0, 7, 11, 3, 1, M_GRY); cyl(M, [9, y0 + 43, 0], [17, y0 + 43, 0], 4.6, 4.6, M_MET, 10); cyl(M, [17, y0 + 43, 0], [18.6, y0 + 43, 0], 4, 4, M_LAMP, 10);   // roof headlamp
+  slab(M, -18, y0 + 2, 0, 9, 17, 22, 3, M_RPD, [8, 16]); for (let i = 0; i < 4; i++) slab(M, -27.4, y0 + 6 + i * 3.6, 0, .8, 13, 1.4, .3, M_MET);   // power pack
+  for (const z of [-1, 1]) { cyl(M, [-18, y0 + 24, z * 10], [-18, y0 + 36, z * 10], 3.6, 3.2, M_MET, 8); cyl(M, [-18, y0 + 36, z * 10], [-18, y0 + 38.5, z * 10], 4.2, 4.2, M_BURN, 8); }   // short stacks
+  cyl(M, [-24, y0 + 22, -14], [-24, y0 + 46, -14], .9, .7, M_MET, 5);
   return M;
 }
 const ARM_POSE = [{ a: -.55, b: -.42 }, { a: .5, b: .95 }, { a: -.07, b: -.14 }];   // 0 carry, 1 raised, 2 level swing
@@ -492,7 +503,7 @@ let READY = false;
 function initSets() { const mk = () => { const o = { body: [], scL: [], scR: [], tail: [] }; for (const n in o) for (let k = 0; k < 8; k++) o[n][k] = []; return o; }; SP.skitter = mk(); SP.ravager = mk(); SP.mech = []; SP.torso = []; for (let k = 0; k < 8; k++) SP.mech[k] = []; }
 /* ---- sprite cache (IndexedDB): the bake is heavy on phones, so keep the result ---- */
 function hashStr(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
-const ASSET_V = 'sp2-' + hashStr([mechLegs, mechTorso, gunMesh, armMesh, skitterParts, ravagerParts, chunkMesh, scrapModel, tankModel, poleModel, wreckModel, crystalModel, tumorModel, habModel, rasterTris, texEval, body, blade, loft, slab, surf, limb, ellip, ik2, gait, buildAssets, bakeParts].map(String).join('|') + JSON.stringify(MATS) + [MSC, GUN_N, MECH_S, GUN_S, ARM_S, JSON.stringify(ARM_POSE), JSON.stringify(SKC), JSON.stringify(RVC_)].join(','));
+const assetV = () => 'sp3b' + BS + '-' + hashStr([mechLegs, mechTorso, gunMesh, armMesh, skitterParts, ravagerParts, chunkMesh, scrapModel, tankModel, poleModel, wreckModel, crystalModel, tumorModel, habModel, rasterTris, rasterCore, crisp, texEval, body, blade, loft, slab, surf, limb, ellip, ik2, gait, buildAssets, bakeParts].map(String).join('|') + JSON.stringify(MATS) + [MSC, GUN_N, MECH_S, GUN_S, ARM_S, JSON.stringify(ARM_POSE), JSON.stringify(SKC), JSON.stringify(RVC_)].join(','));
 function idbOpen() { return new Promise((res, rej) => { const r = indexedDB.open('lastlight', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 async function idbGet(k) { const db = await idbOpen(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function idbPut(k, v) { const db = await idbOpen(); return new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
@@ -505,11 +516,11 @@ function spAssign(key, rec) { const a = key.split('|'); switch (a[0]) { case 'm'
 async function saveAssets() {
   try { const A = 2048, mkA = () => { const c = document.createElement('canvas'); c.width = c.height = A; return { c, x: 0, y: 0, rowH: 0, meta: [] }; }, atl = []; let cur = mkA();
     for (const [key, rec] of spEntries()) { if (!rec || !rec.c) continue; const w = rec.c.width, h = rec.c.height; if (cur.x + w > A) { cur.x = 0; cur.y += cur.rowH + 1; cur.rowH = 0; } if (cur.y + h > A) { atl.push(cur); cur = mkA(); } cur.c.getContext('2d').drawImage(rec.c, cur.x, cur.y); cur.meta.push([key, cur.x, cur.y, w, h, rec.ox, rec.oy]); cur.x += w + 1; cur.rowH = Math.max(cur.rowH, h); }
-    atl.push(cur); const out = []; for (const a of atl) out.push({ blob: await new Promise(r => a.c.toBlob(r, 'image/png')), meta: a.meta }); await idbPut('sprites', { v: ASSET_V, atlases: out }); window.__saved = true; } catch (e) { window.__saveErr = String(e && e.name || e); }
+    atl.push(cur); const out = []; for (const a of atl) out.push({ blob: await new Promise(r => a.c.toBlob(r, 'image/png')), meta: a.meta }); await idbPut('sprites', { v: assetV(), atlases: out }); window.__saved = true; } catch (e) { window.__saveErr = String(e && e.name || e); }
 }
 async function loadAssets() {
-  try { const d = await idbGet('sprites'); if (!d || d.v !== ASSET_V) return false; initSets();
-    for (const a of d.atlases) { const bm = await createImageBitmap(a.blob); for (const [key, x, y, w, h, ox, oy] of a.meta) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(bm, x, y, w, h, 0, 0, w, h); spAssign(key, { c, ox, oy }); } }
+  try { const d = await idbGet('sprites'); if (!d || d.v !== assetV()) return false; initSets();
+    for (const a of d.atlases) { const bm = await createImageBitmap(a.blob); for (const [key, x, y, w, h, ox, oy] of a.meta) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(bm, x, y, w, h, 0, 0, w, h); spAssign(key, { c, ox, oy, w: w / BS, h: h / BS }); } }
     return !!(SP.mech[0][0] && SP.skitter.body[0][0] && SP.p.h); } catch (e) { return false; }
 }
 async function bakeParts(framesParts, cfg, nWalk, yieldUI, tick) {
@@ -526,9 +537,9 @@ async function buildAssets(setMsg) {
   { const tm = mechTorso(), doneT = []; for (let j = 0; j < 16; j++) { const pj = (4 - j + 16) % 16; SP.torso[j] = pj < j && doneT[pj] ? flipSpr(doneT[pj]) : rasterTris(tm, j * TAU / 16, MECH_S, MECH_OX, MECH_OY, MSC, 100, 1.5); doneT[j] = SP.torso[j]; } tick(2); await yieldUI(); }
   for (let gi = 0; gi < 5; gi++) { const gm = gunMesh(GUN_KIND[gi], gi < 3 ? gi : 0); for (let k = 0; k < GUN_N; k++) SP.gun[gi][k] = rasterTris(gm, k * TAU / GUN_N, GUN_S, GUN_S / 2, GUN_S / 2, MSC, 40, 1.5); tick(2); await yieldUI(); }
   for (let p = 0; p < 3; p++) for (const hot of [0, 1]) { const am = armMesh(p, hot), done = []; for (let j = 0; j < GUN_N; j++) { const pj = (8 - j + GUN_N) % GUN_N; SP.arm[p][hot][j] = pj < j && done[pj] ? flipSpr(done[pj]) : rasterTris(am, j * TAU / GUN_N, ARM_S, ARM_S / 2, ARM_S / 2, MSC, 40, 1.4); done[j] = SP.arm[p][hot][j]; } tick(3); await yieldUI(); }
-  const skF = []; for (let f = 0; f < 8; f++) skF.push(skitterParts(f)); for (const p of SK_POSE) skF.push(skitterParts(0, p)); SP.skitter = await bakeParts(skF, { S: SKC.S, ox: SKC.ox, oy: SKC.oy, sc: SKC.sc, ao: 30, ss: 1.75 }, 8, yieldUI, () => tick(3));
+  CG = 1.32; const skF = []; for (let f = 0; f < 8; f++) skF.push(skitterParts(f)); for (const p of SK_POSE) skF.push(skitterParts(0, p)); SP.skitter = await bakeParts(skF, { S: SKC.S, ox: SKC.ox, oy: SKC.oy, sc: SKC.sc, ao: 30, ss: 1.75 }, 8, yieldUI, () => tick(3));
   const rvF = []; for (let f = 0; f < 8; f++) rvF.push(ravagerParts(f)); for (const p of RV_POSE) rvF.push(ravagerParts(0, p)); SP.ravager = await bakeParts(rvF, { S: RVC_.S, ox: RVC_.ox, oy: RVC_.oy, sc: RVC_.sc, ao: 60, ss: 1.5 }, 8, yieldUI, () => tick(4));
-  for (let i = 0; i < 3; i++) SP.chunk[i] = rasterTris(chunkMesh(i), .6 * i, 40, 20, 20, 1.5, 10, 2);
+  CG = 1; for (let i = 0; i < 3; i++) SP.chunk[i] = rasterTris(chunkMesh(i), .6 * i, 40, 20, 20, 1.5, 10, 2);
   SP.p.k = bakeStatic(scrapModel(), 120, 1, 24); SP.p.n = bakeStatic(tankModel(), 120, 1, 50); SP.p.p = bakeStatic(poleModel(), 200, 1, 120); SP.p.f = bakeStatic(wreckModel(), 150, 1, 25, .45);
   SP.p.x = bakeStatic(crystalModel(), 120, 1, 36); SP.p.m = bakeStatic(tumorModel(), 120, 1, 30); await yieldUI(); SP.p.h = bakeStatic(habModel(), 340, 1, 140); READY = true;
 }
@@ -536,7 +547,7 @@ async function buildAssets(setMsg) {
 /* =====================================================================
    GROUND — procedurally textured chunks (dirt, stone slabs, creep)
    ===================================================================== */
-const CH = 512, GP = 6, GTR = .45, gchunks = new Map(), gqueue = []; let frameNo = 0;
+const CH = 512, GP = 6, GTR = .62, gchunks = new Map(), gqueue = []; let frameNo = 0;
 function groundPix(x, y, o) {
   const d = Math.hypot(x, y), n1 = vn(x * .011, y * .011) * .6 + vn(x * .03, y * .03) * .4, n2 = vn(x * .09, y * .09), n3 = vn(x * .35, y * .35);
   let r = 46 + n1 * 36, g = 36 + n1 * 28, b = 30 + n1 * 22; const gv = .8 + .4 * n2; r *= gv; g *= gv; b *= gv;
@@ -762,12 +773,12 @@ const VT = {
   spitter: { k: 'skitter', hp: .9, spd: .8, r: 1, dmg: .6, xp: 9, sc: 1.05, tint: 'rgba(120,255,70,.36)', n: 'Spitter' },
   bloater: { k: 'ravager', hp: .25, spd: 2.1, r: .55, dmg: 1, xp: 9, sc: .58, tint: 'rgba(255,110,40,.46)', n: 'Bloater' },
   ravager: { k: 'ravager', hp: 1, spd: 1, r: 1, dmg: 1, xp: 40, sc: 1, n: 'Ravager' },
-  boss: { k: 'ravager', hp: 3.6, spd: 1.1, r: 1.7, dmg: 1.3, xp: 220, sc: 1.75, tint: 'rgba(210,40,70,.3)', n: 'Hive Guardian' },
+  boss: { k: 'ravager', hp: 3.1, spd: 1.1, r: 1.7, dmg: 1.05, xp: 220, sc: 1.75, tint: 'rgba(210,40,70,.3)', n: 'Hive Guardian' },
 };
 const ELITES = { armored: { n: 'Armored', hp: 3, spd: .9, tint: 'rgba(190,200,215,.4)' }, frenzied: { n: 'Frenzied', hp: 2, spd: 1.45, tint: 'rgba(255,60,40,.38)' }, volatile: { n: 'Volatile', hp: 2, spd: 1, tint: 'rgba(255,150,30,.42)' } };
 function spawnEnemy(type, x, y, el) {
-  const g = G, V = VT[type] || VT.skitter, T = ET[V.k], E = el ? ELITES[el] : null, tm = g.t, hpM = (.72 + tm / 105) * (1 + .22 * (g.heat || 0)), sc = V.sc * (E ? 1.22 : 1);
-  const e = { _k: 'e', k: V.k, t: type, el: el || null, sc, id: g.id++, x, y, r: T.r * V.r * (E ? 1.15 : 1), hp: T.hp * V.hp * hpM * (E ? E.hp : 1), spd: T.spd * V.spd * (E ? E.spd : 1) * (1 + Math.min(.3, tm / 1500)) * rand(.93, 1.07), dmg: T.dmg * V.dmg * (1 + tm / 520) * (1 + .15 * (g.heat || 0)), kx: 0, ky: 0, flash: 0, ph: rand(0, 6), fa: 0, k8: undefined, rx: 0, ry: 0, sq: 0, lost: 0, rage: false, stun: 0, ripN: 0, cd: rand(1.5, 3.5), chg: 0, as: 0, at: 0, acd: rand(.2, .9), arm: el === 'armored' ? .55 : 1, tint: (E && E.tint) || V.tint || null, fuse: 0, mv: null, hidden: false, expo: false, buff: 0, _d: 0 };
+  const g = G, V = VT[type] || VT.skitter, T = ET[V.k], E = el ? ELITES[el] : null, tm = g.t, hpM = (.72 + tm / 105) * (1 + .22 * (g.heat || 0)), sc = V.sc * (E ? 1.22 : 1) * (type === 'boss' ? 1 : 1.12);
+  const e = { _k: 'e', k: V.k, t: type, el: el || null, sc, id: g.id++, x, y, r: T.r * V.r * (E ? 1.15 : 1) * (type === 'boss' ? 1 : 1.08), hp: T.hp * V.hp * hpM * (E ? E.hp : 1), spd: T.spd * V.spd * (E ? E.spd : 1) * (1 + Math.min(.3, tm / 1500)) * rand(.93, 1.07), dmg: T.dmg * V.dmg * (1 + tm / 520) * (1 + .15 * (g.heat || 0)), kx: 0, ky: 0, flash: 0, ph: rand(0, 6), fa: 0, k8: undefined, rx: 0, ry: 0, sq: 0, lost: 0, rage: false, stun: 0, ripN: 0, cd: rand(1.5, 3.5), chg: 0, as: 0, at: 0, acd: rand(.2, .9), arm: el === 'armored' ? .55 : 1, tint: (E && E.tint) || V.tint || null, fuse: 0, mv: null, hidden: false, expo: false, buff: 0, _d: 0 };
   e.reach = e.r + 26 + (V.k === 'ravager' ? 8 : 0); e.maxhp = e.hp; g.en.push(e); return e;
 }
 function ringPos(d) { const a = rand(0, TAU); return [G.x + Math.cos(a) * d, G.y + Math.sin(a) * d]; }
@@ -776,28 +787,28 @@ function pack(type, n, a, spread, el) { const d = spawnDist() + 30; for (let i =
 function warn(txt, radio) { cap('[' + txt + ']'); if (radio) say(radio, true); G.shake = Math.max(G.shake, 4); }
 function bossSpawn(n) { const g = G, [x, y] = edge(rand(0, TAU), spawnDist() + 60), b = spawnEnemy('boss', x, y); b.hp = b.maxhp = b.maxhp * (n === 1 ? 1 : 1.9); g.boss = b; warn('Hive Guardian', n === 1 ? 'Mara: That is no drone — it is the nest\'s guardian. Keep moving and cut it down!' : 'Mara: Another one! Bigger. Hold the line, mechanic.'); }
 const EVENTS = [
-  { t: 55, f: () => { const a = rand(0, TAU); pack('runner', 6, a, .5); warn('Runners incoming', 'Mara: Fast ones off the ' + ['east', 'south', 'west', 'north'][Math.floor(((a % TAU) + TAU) % TAU / (TAU / 4)) % 4] + '. Do not get pinned.'); } },
-  { t: 95, f: () => { pack('spitter', 3, rand(0, TAU), 1.6); warn('Spitters — keep moving', 'Mara: Spitters. They stay back and lob acid. Close the distance or break line of sight.'); } },
-  { t: 120, f: () => { pack('burrower', 3, rand(0, TAU), 2); warn('Burrowers — watch the ground', 'Mara: Something is digging toward you. When the ground marks, step off it.'); } },
-  { t: 140, f: () => { pack('bloater', 3, rand(0, TAU), 1.4); warn('Bloaters — shoot them at range', 'Mara: Swollen ones. Pop them away from you, not next to you.'); } },
+  { t: 55, f: () => { const a = rand(0, TAU); pack('runner', 4, a, .5); warn('Runners incoming', 'Mara: Fast ones off the ' + ['east', 'south', 'west', 'north'][Math.floor(((a % TAU) + TAU) % TAU / (TAU / 4)) % 4] + '. Do not get pinned.'); } },
+  { t: 95, f: () => { pack('spitter', 2, rand(0, TAU), 1.6); warn('Spitters — keep moving', 'Mara: Spitters. They stay back and lob acid. Close the distance or break line of sight.'); } },
+  { t: 120, f: () => { pack('burrower', 2, rand(0, TAU), 2); warn('Burrowers — watch the ground', 'Mara: Something is digging toward you. When the ground marks, step off it.'); } },
+  { t: 140, f: () => { pack('bloater', 2, rand(0, TAU), 1.4); warn('Bloaters — shoot them at range', 'Mara: Swollen ones. Pop them away from you, not next to you.'); } },
   { t: 180, f: () => { pack('skitter', 1, rand(0, TAU), 0, pick(['armored', 'frenzied', 'volatile'])); warn('Elite spotted — big loot', 'Mara: One of them is bigger than the rest. Worth the trouble.'); } },
-  { t: 200, f: () => { pack('shrieker', 1, rand(0, TAU), 0); pack('skitter', 8, rand(0, TAU), 1); warn('Shrieker — silence it', 'Mara: A shrieker. It whips the rest into a frenzy. Kill it first.'); } },
+  { t: 200, f: () => { pack('shrieker', 1, rand(0, TAU), 0); pack('skitter', 5, rand(0, TAU), 1); warn('Shrieker — silence it', 'Mara: A shrieker. It whips the rest into a frenzy. Kill it first.'); } },
   { t: 215, f: () => bossSpawn(1) },
-  { t: 262, f: () => { const a = rand(0, TAU); pack('runner', 12, a, .7); pack('runner', 12, a + Math.PI, .7); warn('Pincer'); } },
-  { t: 300, f: () => { pack('bloater', 5, rand(0, TAU), 2); pack('spitter', 4, rand(0, TAU), 2); warn('Bloaters and spitters'); } },
+  { t: 262, f: () => { const a = rand(0, TAU); pack('runner', 7, a, .7); pack('runner', 7, a + Math.PI, .7); warn('Pincer'); } },
+  { t: 300, f: () => { pack('bloater', 3, rand(0, TAU), 2); pack('spitter', 3, rand(0, TAU), 2); warn('Bloaters and spitters'); } },
   { t: 340, f: () => { const [x, y] = edge(rand(0, TAU), spawnDist() + 40); spawnEnemy('ravager', x, y, pick(['armored', 'frenzied', 'volatile'])); pack('skitter', 1, rand(0, TAU), 0, pick(['armored', 'frenzied'])); warn('Two elites', 'Mara: Elites. Hit them with everything.'); } },
   { t: 380, f: () => bossSpawn(2) },
-  { t: 425, f: () => { for (let i = 0; i < 3; i++) pack(pick(['runner', 'spitter', 'bloater']), 6, rand(0, TAU), 1.2); warn('Dawn is close — last push', 'Mara: They are throwing everything at you. Hold on!'); } },
+  { t: 425, f: () => { for (let i = 0; i < 3; i++) pack(pick(['runner', 'spitter', 'bloater']), 4, rand(0, TAU), 1.2); warn('Dawn is close — last push', 'Mara: They are throwing everything at you. Hold on!'); } },
 ];
 function spawnLogic(dt) {
   const g = G, t = g.t; if (g.demo && g.en.length > 12) return;
-  g.spawnAcc += dt * (.3 + t / 60 * .16) * (g.demo ? .6 : 1) * ST.ecount * (1 + .12 * (g.heat || 0));
-  while (g.spawnAcc >= 1) { g.spawnAcc -= 1; if (g.en.length >= CAP * ST.ecount) continue; const n = irand(2, 3), [x, y] = ringPos(spawnDist() + rand(0, 100)), r = Math.random(); let ty = 'skitter'; if (!g.demo) { if (t > 150 && r < .09) ty = 'spitter'; else if (t > 130 && r < .16) ty = 'burrower'; else if (t > 110 && r < .3) ty = 'runner'; else if (t > 200 && r < .35) ty = 'bloater'; else if (t > 250 && r < .38) ty = 'shrieker'; }
+  g.spawnAcc += dt * (.3 + t / 60 * .16) * .8 * (g.demo ? .6 : 1) * ST.ecount * (1 + .12 * (g.heat || 0));
+  while (g.spawnAcc >= 1) { g.spawnAcc -= 1; if (g.en.length >= CAP * ST.ecount) continue; const n = irand(1, 2), [x, y] = ringPos(spawnDist() + rand(0, 100)), r = Math.random(); let ty = 'skitter'; if (!g.demo) { if (t > 150 && r < .09) ty = 'spitter'; else if (t > 130 && r < .16) ty = 'burrower'; else if (t > 110 && r < .3) ty = 'runner'; else if (t > 200 && r < .35) ty = 'bloater'; else if (t > 250 && r < .38) ty = 'shrieker'; }
     for (let i = 0; i < n; i++) spawnEnemy(ty, x + rand(-45, 45), y + rand(-45, 45), (!g.demo && t > 150 && i === 0 && Math.random() < .05) ? pick(['armored', 'frenzied', 'volatile']) : null); }
   g.ravT -= dt;
   if (!g.demo && t > 45 && g.ravT <= 0) { const cnt = g.en.reduce((a, e) => a + (e.t === 'ravager' ? 1 : 0), 0); if (cnt < 1 + Math.floor(t / 90)) { const [x, y] = ringPos(spawnDist() + 40); spawnEnemy('ravager', x, y); if (!g.sawRav) { g.sawRav = true; say(pick(LINES.rav), true); } } g.ravT = rand(8, 13); }
   if (!g.demo) while (g.evI < EVENTS.length && t >= EVENTS[g.evI].t) EVENTS[g.evI++].f();
-  if (g.surges.length && t >= g.surges[0]) { g.surges.shift(); say(pick(LINES.surge), true); const n = Math.max(4, Math.round((12 + Math.floor(t / 22)) * ST.ecount)), d = spawnDist() + 40; for (let i = 0; i < n; i++) { const a = i / n * TAU; spawnEnemy('skitter', g.x + Math.cos(a) * d, g.y + Math.sin(a) * d); }
+  if (g.surges.length && t >= g.surges[0]) { g.surges.shift(); say(pick(LINES.surge), true); const n = Math.max(4, Math.round((7 + Math.floor(t / 45)) * ST.ecount)), d = spawnDist() + 40; for (let i = 0; i < n; i++) { const a = i / n * TAU; spawnEnemy('skitter', g.x + Math.cos(a) * d, g.y + Math.sin(a) * d); }
     for (let i = 0; i < Math.floor(t / 200); i++) { const [x, y] = ringPos(d); spawnEnemy('ravager', x, y); } g.shake = 6; }
   if (!g.demo) { if (!g.ph2 && t > 150) { g.ph2 = true; cap('[The nest closes in]'); } if (!g.ph3 && t > 330) { g.ph3 = true; cap('[Last light — the sky burns]'); } }
   if (!g.evacSaid && t > EVAC - 25) { g.evacSaid = true; say(pick(LINES.evac), true); }
@@ -854,7 +865,7 @@ function bossAI(e, dt, d, mx, my, sp) { const g = G, enr = e.hp < e.maxhp * .4; 
   e.cd4 = (e.cd4 === undefined ? 4 : e.cd4) - dt; e.cd5 = (e.cd5 === undefined ? 8 : e.cd5) - dt;
   if (e.cd4 <= 0 && d < 240 && !g.demo) { e.cd4 = enr ? 5 : 7; startSlam(e, 150, e.dmg * 1.1, 1.0); cap('[Ground slam — get out!]'); return [mx, my, 0]; }
   if (e.hp < e.maxhp * .66 && e.cd5 <= 0 && d < 560 && !g.demo) { e.cd5 = enr ? 7 : 10; cap('[Bile rain!]'); sfx.spit(); for (let i = 0; i < 6; i++) addHz(g.x + g.vx * (.4 + i * .12) + rand(-70, 70), g.y + g.vy * (.4 + i * .12) + rand(-70, 70), 58, .9 + i * .22, 15, 'bile', e); }
-  if (e.cd2 <= 0) { e.cd2 = enr ? 6 : 9; const n = enr ? 8 : 5; for (let i = 0; i < n; i++) { const a = i / n * TAU; spawnEnemy(Math.random() < .3 ? 'runner' : 'skitter', e.x + Math.cos(a) * 70, e.y + Math.sin(a) * 70); } sfx.splat(); }
+  if (e.cd2 <= 0) { e.cd2 = enr ? 6 : 9; const n = enr ? 6 : 4; for (let i = 0; i < n; i++) { const a = i / n * TAU; spawnEnemy(Math.random() < .3 ? 'runner' : 'skitter', e.x + Math.cos(a) * 70, e.y + Math.sin(a) * 70); } sfx.splat(); }
   if (e.cd <= 0 && d < 520 && !g.demo) { e.cd = enr ? 3 : 4.2; e.chg = .5; sfx.spit(); for (let i = -1; i <= 1; i++) { const a = Math.atan2(g.y - e.y, g.x - e.x) + i * .35, dd = Math.min(d, 380); g.ac.push({ s: 0, x0: e.x, y0: e.y, x: e.x, y: e.y, tx: e.x + Math.cos(a) * dd, ty: e.y + Math.sin(a) * dd, t: 0, T: 1.1, r: 46, dmg: 14, h: 0, life: 0, tick: 0 }); } }
   e.chg = Math.max(0, e.chg - dt); if (d < 240) sp *= .3; return [mx, my, sp]; }
 function explodeAt(e, r, dmgP, dmgE) { const g = G; g.sw.push({ x: e.x, y: e.y, r, t: 0, dur: .45 }); sfx.boom(); g.shake = Math.max(g.shake, 8); g.freeze = Math.max(g.freeze, .04);
@@ -892,11 +903,11 @@ function blast(x, y, r, dmg, kb) { const g = G; g.sw.push({ x, y, r, t: 0, dur: 
   for (const e of g.en) { if (e.dead) continue; const dx = e.x - x, dy = e.y - y, d = Math.hypot(dx, dy) || 1; if (d < r + e.r) hurtEnemy(e, dmg, dx / d, dy / d, kb); }
   for (let i = 0; i < 16; i++) { const a = rand(0, TAU), v = rand(80, 240); pt(x, y, 8, Math.cos(a) * v, Math.sin(a) * v, rand(40, 140), rand(.35, .7), '#ffb060', rand(1.6, 3), 'spark'); } }
 function dropPick(x, y, kind, v) { const g = G; if (g.demo) return; if (kind === 'xp' && g.gem.length > 240) { gainXp(v); return; } if (g.gem.length > 300) return; const a = rand(0, TAU), sp = rand(40, 130); g.gem.push({ x, y, v, kind, ph: rand(0, 6), mg: false, sp: 0, z: 6, vz: rand(160, 270), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, age: 0 }); }
-function dropLoot(e) { const g = G, V = VT[e.t] || VT.skitter, bossT = e.t === 'boss', big = e.t === 'ravager' || bossT || !!e.el, M = g.M; if (g.demo || e.nol) return; dropPick(e.x, e.y, 'xp', Math.round(V.xp * (e.el ? 3 : 1)));
+function dropLoot(e) { const g = G, V = VT[e.t] || VT.skitter, bossT = e.t === 'boss', big = e.t === 'ravager' || bossT || !!e.el, M = g.M; if (g.demo || e.nol) return; dropPick(e.x, e.y, 'xp', Math.round(V.xp * (e.el ? 3 : 1) * 1.6));
   const need = f => 1.7 - 1.1 * f, tch = g.gt === 'tch', roll = c => { let n = Math.floor(c); if (Math.random() < c - n) n++; return n; }, mul = bossT ? 4 : 1;
-  for (let i = roll((big ? 1 : .3) * M.dAmmo * need(g.ammo / g.ammoMax) * (tch ? .35 : 1) * mul); i > 0; i--) dropPick(e.x, e.y, 'ammo', big ? 60 : 24);
-  for (let i = roll((big ? 1 : .15) * M.dFuel * need(g.fuel / g.fuelMax) * (tch ? 2.2 : 1) * mul); i > 0; i--) dropPick(e.x, e.y, 'fuel', big ? 45 : 22);
-  for (let i = roll((big ? 1 : .4) * M.dScrap * (bossT ? 3 : e.el ? 1.5 : 1)); i > 0; i--) dropPick(e.x, e.y, 'scrap', big ? 8 : 1);
+  for (let i = roll((big ? 1 : .45) * M.dAmmo * need(g.ammo / g.ammoMax) * (tch ? .35 : 1) * mul); i > 0; i--) dropPick(e.x, e.y, 'ammo', big ? 60 : 24);
+  for (let i = roll((big ? 1 : .22) * M.dFuel * need(g.fuel / g.fuelMax) * (tch ? 2.2 : 1) * mul); i > 0; i--) dropPick(e.x, e.y, 'fuel', big ? 45 : 22);
+  for (let i = roll((big ? 1 : .5) * M.dScrap * (bossT ? 3 : e.el ? 1.5 : 1)); i > 0; i--) dropPick(e.x, e.y, 'scrap', big ? 8 : 1);
   for (let i = roll((big ? .5 : .02) * M.hk * (1.8 - g.hp / g.maxhp) * (bossT ? 3 : 1)); i > 0; i--) dropPick(e.x, e.y, 'rep', 18); }
 let lastLootSnd = 0;
 function collect(q) { const g = G, nw = performance.now(); if (nw - lastLootSnd > 40) { lastLootSnd = nw; if (q.kind === 'xp') sfx.pick(); else sfx.loot(['xp', 'scrap', 'ammo', 'fuel', 'rep'].indexOf(q.kind)); }
@@ -976,7 +987,7 @@ function updBlade(dt) {
 }
 function plant() { const g = G, yaw = g.bk * PI4, c = Math.cos(yaw), sn = Math.sin(yaw), s = (g.stepN & 1) ? 1 : -1, lx_ = 4 * MSC, lz = s * 15 * MSC, fx = g.x + lx_ * c - lz * sn, fy = g.y + lx_ * sn + lz * c; g.bump = 1; g.sq = 1; g.shake = Math.max(g.shake, 1.8); if (!g.demo) sfx.step();
   for (let i = 0; i < 4; i++) pt(fx, fy, 3, rand(-35, 35), rand(-35, 35), rand(10, 30), rand(.5, .9), 'rgba(116,100,80,.5)', rand(6, 11), 'smoke'); }
-function exhaust() { const g = G, yaw = g.tj * TAU / 16, c = Math.cos(yaw), sn = Math.sin(yaw); for (const z of [-9, 9]) { const lx_ = -16 * MSC, lz = z * MSC, wx = g.x + lx_ * c - lz * sn, wy = g.y + lx_ * sn + lz * c; pt(wx, wy, 104 * 1.04 * MSC, rand(-10, 10) - g.vx * .1, rand(-10, 10) - g.vy * .1, rand(25, 45), rand(.7, 1.2), 'rgba(26,24,24,.55)', rand(3, 5), 'smoke'); } }
+function exhaust() { const g = G, yaw = g.tj * TAU / 16, c = Math.cos(yaw), sn = Math.sin(yaw); for (const z of [-9, 9]) { const lx_ = -16 * MSC, lz = z * MSC, wx = g.x + lx_ * c - lz * sn, wy = g.y + lx_ * sn + lz * c; pt(wx, wy, 86 * 1.04 * MSC, rand(-10, 10) - g.vx * .1, rand(-10, 10) - g.vy * .1, rand(25, 45), rand(.7, 1.2), 'rgba(26,24,24,.55)', rand(3, 5), 'smoke'); } }
 function updMoves(dt) {
   const g = G; let n120 = 0, n170 = 0, rav = false; for (const e of g.en) { const d2 = (e.x - g.x) ** 2 + (e.y - g.y) ** 2; if (d2 < 120 * 120) n120++; if (d2 < 170 * 170) { n170++; if (e.k === 'ravager') rav = true; } }
   g.stT -= dt; if (g.stT <= 0 && (n120 >= 3 || rav)) { g.stT = 9; doStomp(); if (!g.mvSaid) { g.mvSaid = true; say(pick(LINES.moves), true); } }
@@ -1144,7 +1155,7 @@ function flame(X, Y, w, h, t, sd) {
   const layer = (k, col) => { const ww = w * k, h2 = hh * (.55 + k * .45); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(X - ww, Y); ctx.quadraticCurveTo(X - ww * 1.25, Y - h2 * .5, X + sw * k, Y - h2); ctx.quadraticCurveTo(X + ww * 1.25, Y - h2 * .5, X + ww, Y); ctx.closePath(); ctx.fill(); };
   layer(1, 'rgba(190,50,10,.9)'); layer(.7, 'rgba(255,130,30,.95)'); layer(.38, 'rgba(255,225,130,.95)');
 }
-function drawSpr(sp, X, Y, flash) { ctx.drawImage(flash ? flashOf(sp.c) : sp.c, X - sp.ox, Y - sp.oy, sp.c.width, sp.c.height); }
+function drawSpr(sp, X, Y, flash) { ctx.drawImage(flash ? flashOf(sp.c) : sp.c, X - sp.ox, Y - sp.oy, sp.w, sp.h); }
 const darkCache = new WeakMap();
 function darkOf(c) { let d = darkCache.get(c); if (!d) { d = document.createElement('canvas'); d.width = c.width; d.height = c.height; const x = d.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(8,4,6,.6)'; x.fillRect(0, 0, d.width, d.height); darkCache.set(c, d); } return d; }
 /* ---- firelight: every flame, jet, burning bug and muzzle flash warms the sprites near it ---- */
@@ -1160,13 +1171,12 @@ function drawMech(X, Y) {
   const gi = g.gt === 'gat' ? Math.floor(g.brot) % 3 : GUNS[g.gt].gi, gspr = SP.gun[gi][g.ka], gun = { spr: gspr, x: X + pg[0] - (Math.cos(ay) - Math.sin(ay)) * IX * gkick, y: Y + pg[1] - (Math.cos(ay) + Math.sin(ay)) * IY * gkick, behind: (gx + Math.cos(ay) * 24) + (gz + Math.sin(ay) * 24) < 0 };
   const pb = pl(0, SH_Y + bob, -SH_Z, tyaw, MSC), ba = g.barmA, S = g.sw2, bk32 = a => ((Math.round(a / (TAU / GUN_N)) % GUN_N) + GUN_N) % GUN_N, hot = g.bt === 'the' ? 1 : 0, bsc = g.bsc || 1;
   const arm = { spr: SP.arm[g.barmP][hot][bk32(ba)], x: X + pb[0], y: Y + pb[1], behind: (SH_Z * Math.sin(tyaw) + Math.cos(ba) * 24) + (-SH_Z * Math.cos(tyaw) + Math.sin(ba) * 24) < 0 };
-  const drawArm = () => { if (S && S.tr.length > 1) for (let i = 0; i < S.tr.length - 1; i += 1) { const q = S.tr[i], sp = SP.arm[q.p][hot][bk32(q.a)]; ctx.globalAlpha = .05 + .16 * (1 - S.tr[i].age / .15); ctx.drawImage(sp.c, arm.x - sp.ox * bsc, arm.y - sp.oy * bsc, sp.c.width * bsc, sp.c.height * bsc); } ctx.globalAlpha = 1;
-    const sp = arm.spr, x0 = arm.x - sp.ox * bsc, y0 = arm.y - sp.oy * bsc, w = sp.c.width * bsc, h = sp.c.height * bsc; ctx.drawImage(flash ? flashOf(sp.c) : sp.c, x0, y0, w, h); warmSpr(sp, x0, y0, w, h, wk); };
-  const drawGun = () => { const sp = gun.spr, x0 = gun.x - sp.ox, y0 = gun.y - sp.oy; ctx.drawImage(sp.c, x0, y0); warmSpr(sp, x0, y0, sp.c.width, sp.c.height, wk); };
-  const legs = SP.mech[k][f], tor = SP.torso[tj], tb = -bob * 1.04 * MSC; ctx.drawImage(flash ? flashOf(legs.c) : legs.c, X - legs.ox, Y - legs.oy); warmSpr(legs, X - legs.ox, Y - legs.oy, legs.c.width, legs.c.height, wk);
+  const drawArm = () => { if (S && S.tr.length > 1) for (let i = 0; i < S.tr.length - 1; i += 1) { const q = S.tr[i], sp = SP.arm[q.p][hot][bk32(q.a)]; ctx.globalAlpha = .05 + .16 * (1 - S.tr[i].age / .15); ctx.drawImage(sp.c, arm.x - sp.ox * bsc, arm.y - sp.oy * bsc, sp.w * bsc, sp.h * bsc); } ctx.globalAlpha = 1;
+    const sp = arm.spr, x0 = arm.x - sp.ox * bsc, y0 = arm.y - sp.oy * bsc, w = sp.w * bsc, h = sp.h * bsc; ctx.drawImage(flash ? flashOf(sp.c) : sp.c, x0, y0, w, h); warmSpr(sp, x0, y0, w, h, wk); };
+  const drawGun = () => { const sp = gun.spr, x0 = gun.x - sp.ox, y0 = gun.y - sp.oy; ctx.drawImage(sp.c, x0, y0, sp.w, sp.h); warmSpr(sp, x0, y0, sp.w, sp.h, wk); };
+  const legs = SP.mech[k][f], tor = SP.torso[tj], tb = -bob * 1.04 * MSC; ctx.drawImage(flash ? flashOf(legs.c) : legs.c, X - legs.ox, Y - legs.oy, legs.w, legs.h); warmSpr(legs, X - legs.ox, Y - legs.oy, legs.w, legs.h, wk);
   if (arm.behind) drawArm(); if (gun.behind) drawGun();
-  if (!ST.contrast) { ctx.globalAlpha = .3; ctx.drawImage(haloOf(tor.c, 'rgba(210,228,255,.9)'), X - tor.ox - 9, Y - tor.oy + tb - 9); ctx.globalAlpha = 1; }
-  ctx.drawImage(flash ? flashOf(tor.c) : tor.c, X - tor.ox, Y - tor.oy + tb); warmSpr(tor, X - tor.ox, Y - tor.oy + tb, tor.c.width, tor.c.height, wk);
+  ctx.drawImage(flash ? flashOf(tor.c) : tor.c, X - tor.ox, Y - tor.oy + tb, tor.w, tor.h); warmSpr(tor, X - tor.ox, Y - tor.oy + tb, tor.w, tor.h, wk);
   if (!gun.behind) drawGun(); if (!arm.behind) drawArm();
   ctx.restore();
 }
@@ -1186,20 +1196,20 @@ function drawEnemy(e, X, Y) {
   const fl = e.flash > 0 && !ST.flash, near = sg => (K.cx * (c_ + s_) + sg * K.cz * (c_ - s_)) > 0, tailNear = -(c_ + s_) > 0, L = !(e.lost & 1), R_ = !(e.lost & 2), T_ = !(e.lost & 4), parts = [];
   if (T_ && !tailNear) parts.push(set.tail[k][f]); if (L && !near(-1)) parts.push(set.scL[k][f]); if (R_ && !near(1)) parts.push(set.scR[k][f]); parts.push(set.body[k][f]);
   if (T_ && tailNear) parts.push(set.tail[k][f]); if (L && near(-1)) parts.push(set.scL[k][f]); if (R_ && near(1)) parts.push(set.scR[k][f]);
-  { const bd = set.body[k][f]; if (bd && bd.c.width > 1 && !ST.contrast) { const tier = e.t === 'boss' ? 2 : e.el ? 1 : 0, rc = tier === 2 ? 'rgba(255,200,90,.95)' : tier === 1 ? 'rgba(110,160,255,.95)' : 'rgba(200,212,235,.9)'; ctx.globalAlpha = tier === 2 ? .85 : tier === 1 ? .75 : .34 + (e.expo ? .3 : 0); ctx.drawImage(haloOf(bd.c, rc), X - bd.ox - 9, Y - bd.oy - 9); ctx.globalAlpha = 1; } if (bd && bd.c.width > 1) FLOOR.push(bd.c, X + (-bd.ox) * sc, Y + (-bd.oy) * sc, bd.c.width * sc, bd.c.height * sc, e.t === 'boss' ? .55 : e.el ? .42 : e.expo ? .4 : .26, e.tint); }
-  if (ST.contrast) for (const sp of parts) if (sp && sp.c.width > 1) { const o = outlineOf(sp.c); for (const [ox, oy] of OFS) ctx.drawImage(o, X - sp.ox + ox, Y - sp.oy + oy); }
-  for (const sp of parts) if (sp && sp.c.width > 1) { ctx.drawImage(fl ? flashOf(sp.c) : e.tint ? tintOf(sp.c, e.tint) : sp.c, X - sp.ox, Y - sp.oy); if (wk > .04) warmSpr(sp, X - sp.ox, Y - sp.oy, sp.c.width, sp.c.height, wk); }
+  { const bd = set.body[k][f]; if (bd && bd.w > 1) FLOOR.push(bd.c, X + (-bd.ox) * sc, Y + (-bd.oy) * sc, bd.w * sc, bd.h * sc, e.t === 'boss' ? .55 : e.el ? .42 : e.expo ? .4 : .26, e.tint); }
+  if (ST.contrast) for (const sp of parts) if (sp && sp.w > 1) { const o = outlineOf(sp.c); for (const [ox, oy] of OFS) ctx.drawImage(o, X - sp.ox + ox, Y - sp.oy + oy, sp.w, sp.h); }
+  for (const sp of parts) if (sp && sp.w > 1) { ctx.drawImage(fl ? flashOf(sp.c) : e.tint ? tintOf(sp.c, e.tint) : sp.c, X - sp.ox, Y - sp.oy, sp.w, sp.h); if (wk > .04) warmSpr(sp, X - sp.ox, Y - sp.oy, sp.w, sp.h, wk); }
   if (squash) ctx.restore();
   if (e.expo) { const yy = Y - (big ? 118 : 70) * esc - 6, bob = Math.sin(performance.now() / 120) * 2; ctx.fillStyle = '#ffd24a'; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X - 6, yy + bob); ctx.lineTo(X + 6, yy + bob); ctx.lineTo(X, yy + 9 + bob); ctx.closePath(); ctx.stroke(); ctx.fill(); }
   if (e.el) { const nm = ELITES[e.el].n + ' ' + (VT[e.t].n || 'Skitter'), ny = Y - (big ? 128 : 74) * esc - 7; ctx.font = `bold ${Math.round(13 * ST.text)}px Georgia,serif`; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.92)'; ctx.strokeText(nm, X, ny); ctx.fillStyle = '#8fb4ff'; ctx.fillText(nm, X, ny); }
   if (e.hp < e.maxhp && e.t !== 'boss') { const w = (big ? 56 : 26) * Math.max(1, esc * .9), yy = Y - (big ? 128 : 74) * esc; ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(X - w / 2 - 1, yy - 1, w + 2, 4.5); ctx.fillStyle = e.rage ? '#d03a22' : big ? '#9a3a22' : '#b84a2a'; ctx.fillRect(X - w / 2, yy, w * e.hp / e.maxhp, 2.5); }
 }
 function drawGib(q, X, Y) {
-  const sp = q.spr; if (!sp || sp.c.width < 2) return; const w = sp.c.width, h = sp.c.height, cx = w / 2 - sp.ox, cy = h / 2 - sp.oy, a = clamp((q.life - q.t) / 2, 0, 1);
-  if (!q.land) ctx.drawImage(SHADOW, X - 12, Y - 5, 24, 10); ctx.save(); ctx.globalAlpha = a; if (q.land) { ctx.translate(X + cx * .5, Y + cy * .3); ctx.scale(1, .72); } else ctx.translate(X + cx, Y - q.z + cy); ctx.rotate(q.rot); ctx.drawImage(q.land ? darkOf(sp.c) : sp.c, -w / 2, -h / 2); ctx.restore(); ctx.globalAlpha = 1;
+  const sp = q.spr; if (!sp || sp.w < 2) return; const w = sp.w, h = sp.h, cx = w / 2 - sp.ox, cy = h / 2 - sp.oy, a = clamp((q.life - q.t) / 2, 0, 1);
+  if (!q.land) ctx.drawImage(SHADOW, X - 12, Y - 5, 24, 10); ctx.save(); ctx.globalAlpha = a; if (q.land) { ctx.translate(X + cx * .5, Y + cy * .3); ctx.scale(1, .72); } else ctx.translate(X + cx, Y - q.z + cy); ctx.rotate(q.rot); ctx.drawImage(q.land ? darkOf(sp.c) : sp.c, -w / 2, -h / 2, w, h); ctx.restore(); ctx.globalAlpha = 1;
 }
-function drawCorpse(c, X, Y) { const sp = c.spr; if (!sp || sp.c.width < 2) return; const u = clamp(c.t / .22, 0, 1), a = clamp((7 - c.t) / 2.5, 0, 1); ctx.save(); ctx.globalAlpha = a; ctx.translate(X, Y); ctx.scale(1 + .22 * u, 1 - .68 * u); ctx.translate(-X, -Y); const cs = c.sc || 1; ctx.drawImage(u > .5 ? darkOf(sp.c) : sp.c, X - sp.ox * cs, Y - sp.oy * cs, sp.c.width * cs, sp.c.height * cs); ctx.restore(); ctx.globalAlpha = 1; }
-function drawProp(o, X, Y) { const sp = SP.p[o._k]; if (!sp) return; const s = o._k === 'h' ? 1 : o.s * .92; if (o._k === 'f' || o._k === 'm') { ctx.drawImage(SHADOW, X - 34 * s, Y - 14 * s, 68 * s, 34 * s); } ctx.drawImage(sp.c, X - sp.ox * s, Y - sp.oy * s, sp.c.width * s, sp.c.height * s); if (o._k !== 'f') { const wk = warmK(X, Y - 20 * s); if (wk > .04) warmSpr(sp, X - sp.ox * s, Y - sp.oy * s, sp.c.width * s, sp.c.height * s, wk * .9); } }
+function drawCorpse(c, X, Y) { const sp = c.spr; if (!sp || sp.w < 2) return; const u = clamp(c.t / .22, 0, 1), a = clamp((7 - c.t) / 2.5, 0, 1); ctx.save(); ctx.globalAlpha = a; ctx.translate(X, Y); ctx.scale(1 + .22 * u, 1 - .68 * u); ctx.translate(-X, -Y); const cs = c.sc || 1; ctx.drawImage(u > .5 ? darkOf(sp.c) : sp.c, X - sp.ox * cs, Y - sp.oy * cs, sp.w * cs, sp.h * cs); ctx.restore(); ctx.globalAlpha = 1; }
+function drawProp(o, X, Y) { const sp = SP.p[o._k]; if (!sp) return; const s = o._k === 'h' ? 1 : o.s * .92; if (o._k === 'f' || o._k === 'm') { ctx.drawImage(SHADOW, X - 34 * s, Y - 14 * s, 68 * s, 34 * s); } ctx.drawImage(sp.c, X - sp.ox * s, Y - sp.oy * s, sp.w * s, sp.h * s); if (o._k !== 'f') { const wk = warmK(X, Y - 20 * s); if (wk > .04) warmSpr(sp, X - sp.ox * s, Y - sp.oy * s, sp.w * s, sp.h * s, wk * .9); } }
 
 const PKI = {};
 function pkIcon(kd) { let c = PKI[kd]; if (c) return c; c = PKI[kd] = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.translate(32, 32); x.scale(2.4, 2.4); x.lineWidth = 1.3; x.strokeStyle = 'rgba(0,0,0,.85)';
@@ -1248,15 +1258,15 @@ function render() {
     for (const w of g.wv) if (w.hot) { const X = SX(w.x, w.y), Y = SY(w.x, w.y); lights.push(X, Y - 40, 110 + w.r, .85, 0); warm.push(X, Y, 130 + w.r, .9); }
     if (g.od > 0) { const X = SX(g.x, g.y), Y = SY(g.x, g.y); lights.push(X, Y - 40, 180, .5, 0); warm.push(X, Y, 150, .35); } }
   for (const e of g.en) { e._d = e.x + e.y; R.push(e); } for (const q of g.gibs) { q._d = q.x + q.y; q._k = 'g'; R.push(q); } for (const c of g.corp) { c._d = c.x + c.y - 2; c._k = 'c'; R.push(c); } g._d = g.x + g.y; g._k = 'p0'; R.push(g); R.sort((a, b) => a._d - b._d);
-  if (READY) for (const o of R) {
-    const X = SX(o.x, o.y), Y = SY(o.x, o.y); if (X < -hw - 120 || X > hw + 120 || Y < -hhT - 140 || Y > hhB + 140) continue;
+  const kS = RS * Z; if (READY) for (const o of R) {
+    const X = Math.round(SX(o.x, o.y) * kS) / kS, Y = Math.round(SY(o.x, o.y) * kS) / kS; if (X < -hw - 120 || X > hw + 120 || Y < -hhT - 140 || Y > hhB + 140) continue;
     if (o._k === 'e') { if (!o.hidden) { drawEnemy(o, X, Y); eL.push(X, Y); } } else if (o._k === 'p0') drawMech(X, Y); else if (o._k === 'g') drawGib(o, X, Y); else if (o._k === 'c') drawCorpse(o, X, Y); else drawProp(o, X, Y);
   }
   // ---- lighting: near-black ambient with holes for light sources
   const px = SX(g.x, g.y), py = SY(g.x, g.y), ls = RS * .5, ambA = lerp(.74, .58, prog * prog) * (1 - .6 * ST.bright - (ST.contrast ? .12 : 0)), dw = prog * prog, bm = biome(g.t).a;
   lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = 'source-over'; lx.clearRect(0, 0, lc.width, lc.height); lx.fillStyle = `rgba(${Math.round(lerp(bm[0], 52, dw * .6))},${Math.round(lerp(bm[1], 32, dw * .6))},${Math.round(lerp(bm[2], 26, dw * .6))},${ambA})`; lx.fillRect(0, 0, lc.width, lc.height);
   lx.setTransform(ls * Z, 0, 0, ls * Z, ls * OX, ls * OY); lx.globalCompositeOperation = 'destination-out';
-  const fa = Math.atan2(Math.sin(g.faceA) / .55, Math.cos(g.faceA)), lampP = pl(16, 94 + mechBob(mechFrame()), 0, g.tj * TAU / 16, MSC), lampX = px + lampP[0], lampY = py + lampP[1];
+  const fa = Math.atan2(Math.sin(g.faceA) / .55, Math.cos(g.faceA)), lampP = pl(18, 89 + mechBob(mechFrame()), 0, g.tj * TAU / 16, MSC), lampX = px + lampP[0], lampY = py + lampP[1];
   lx.save(); lx.translate(lampX, lampY); lx.scale(1, .55); lx.rotate(fa); lx.drawImage(CONE, 0, -540, 1080, 1080); lx.restore();
   lx.globalAlpha = .95; lx.drawImage(GL.w, px - 170, py - 125, 340, 210); lx.globalAlpha = .55; for (let i = 0; i < eL.length; i += 2) lx.drawImage(GL.w, eL[i] - 40, eL[i + 1] - 44, 80, 60);
   for (let i = 0; i < lights.length; i += 5) { lx.globalAlpha = Math.min(1, lights[i + 3]); const r = lights[i + 2]; lx.drawImage(GL.w, lights[i] - r, lights[i + 1] - r * .75, r * 2, r * 1.5); }
@@ -1564,7 +1574,7 @@ function frame(now) {
 }
 resize(); newGame(true);
 (async () => {
-  const btn = $('startBtn'), tb = performance.now(); btn.textContent = 'Loading…'; let ok = false; try { ok = await loadAssets(); } catch (e) { ok = false; }
+  BS = clamp(Math.round(DPR0 * Q * Zb * 4) / 4, 1, 2.5); const btn = $('startBtn'), tb = performance.now(); btn.textContent = 'Loading…'; let ok = false; try { ok = await loadAssets(); } catch (e) { ok = false; }
   window.__boot = { cached: ok, ms: Math.round(performance.now() - tb) };
   if (!ok) { await buildAssets(m => { btn.textContent = m; }); saveAssets(); } else READY = true;
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { getChunk(i, j); } pumpChunks(9); btn.textContent = 'Deploy'; btn.disabled = false; if (document.getElementById('title').classList.contains('on')) btn.focus({ preventScroll: true });

@@ -26,9 +26,11 @@ Each keystone has two more steps (a branch upgrade, then a capstone). The level-
 
 Modelled on what makes Diablo 1/2 (and the D2R remaster's approach of keeping the original mood while adding dynamic light) readable:
 
+- **Crisp, not soft.** Sprites are baked at screen resolution (not stretched), hard-edged and sharpened with a 1px dark outline, and snapped to device pixels. Ground texture is denser. No glow halos around actors.
+- **Fewer, bigger bugs.** The on-screen cap is about half what it was and bugs are ~12% larger, with tougher health, so each one reads as an individual.
 - **Darkness makes light meaningful.** Near-black edges, the headlamp cone, and fires as pools of warm light. Each phase of the night has its own palette (scrapyard, hive, last light), like Diablo's per-area palettes.
-- **Quiet ground, loud actors.** The ground is dimmed and tinted so bugs, the rig and pickups carry the contrast. Every bug gets a faint silhouette rim and a minimum brightness so it never vanishes into the black.
-- **Threat tier in the name, Diablo style.** Normal bugs are plain, **elites have a blue ring/halo and a name tag** ("Armored Skitter"), **bosses are gold**. Ring patterns differ by affix as well as colour.
+- **Quiet ground, loud actors.** The ground is dimmed and tinted so bugs, the rig and pickups carry the contrast; bug sprites are brightened and keep a minimum brightness so they never vanish into the black.
+- **Threat tier in the name, Diablo style.** Normal bugs are plain, **elites have a blue ring and a name tag** ("Armored Skitter"), **bosses are gold**. Ring patterns differ by affix as well as colour.
 - **A colour budget.** Fire orange is player and world; **crimson is enemy attacks** (with its own dash pattern per attack type); violet is ambushes, blue is buffs, green is acid; pickups differ by shape.
 - **Fewer numbers.** Only hits of 30+ damage show a number.
 
