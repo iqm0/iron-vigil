@@ -672,7 +672,7 @@ nd('sal_pack', 'bulwark', 3, 'Pack Rat', 'Every 15 scrap you carry adds +1% dama
 nd('sal_mkt', 'bulwark', 4, 'Black Market', 'Level-ups show four options, and the first reroll of each is free.', null, 'sal_pack');
 const NEED = l => Math.round(120 + 55 * l + 8 * l * l);
 const RIGS = ['k_rot', 'k_sct', 'k_tch'], RIG_SUB = { k_rot: 'Gatling rig — sustained fire', k_sct: 'Scattergun rig — close-range burst', k_tch: 'Flamethrower rig — fire control' };
-const GUNS = { gat: { range: 600, mz: 54, gi: 0 }, sct: { range: 400, mz: 60, gi: 3 }, tch: { range: 255, mz: 52, gi: 4 } };
+const GUNS = { gat: { range: 600, mz: 54, gi: 0 }, sct: { range: 400, mz: 60, gi: 3 }, tch: { range: 285, mz: 52, gi: 4 } };
 /* ---------- synergies: pairing keystones across lanes unlocks a named bonus (the build's "recipes") ---------- */
 const SYN = [
   { id: 'pyro', n: 'Pyromania', need: ['k_tch', 'k_the'], d: 'Burning bugs take 35% more damage, and blade swings leave fire pools.' },
@@ -1027,7 +1027,7 @@ function fireTch(dt, best) {
   if (!(g.od > 0 && hasS('forge'))) g.fuel = Math.max(0, g.fuel - 9 * (hasN('tch_con') ? .7 : 1) * dt); g.muz[1] = .06; g.shake = Math.max(g.shake, .35);
   for (let i = 0, n = Q > .7 ? 4 : 2; i < n; i++) { const a = aim + rand(-.11, .11), sp = rng * rand(2.6, 3.4); if (g.fl.length < 90) g.fl.push({ x: mx, y: my, z: MUZ_H - 6, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: rand(-10, 30), t: 0, max: rand(.42, .6), s: rand(.7, 1.1), sd: rand(0, 9) }); }
   g.fs = (g.fs || 0) - dt; if (g.fs <= 0) { g.fs = .22; sfx.flame(); } g.jt -= dt; if (g.jt <= 0) { g.jt = .1;
-    for (const e of g.en) { if (e.dead) continue; const dx = e.x - mx, dy = e.y - my, d = Math.hypot(dx, dy) || 1; if (d > rng + e.r) continue; if (Math.abs(angDiff(aim, Math.atan2(dy, dx))) > .27 + e.r / d * .6) continue; hurtEnemy(e, 5.5 * M.gunDmg, dx / d, dy / d, 55, true); if (!e.dead) { e.burn = Math.max(e.burn || 0, 3); e.bd = 8 * M.gunDmg; e.bt = Math.min(e.bt || .5, .5); e.stun = Math.max(e.stun, .05); } } }
+    for (const e of g.en) { if (e.dead) continue; const dx = e.x - mx, dy = e.y - my, d = Math.hypot(dx, dy) || 1; if (d > rng + e.r) continue; if (Math.abs(angDiff(aim, Math.atan2(dy, dx))) > .27 + e.r / d * .6) continue; hurtEnemy(e, 8 * M.gunDmg, dx / d, dy / d, 55, true); if (!e.dead) { e.burn = Math.max(e.burn || 0, 3); e.bd = 11 * M.gunDmg; e.bt = Math.min(e.bt || .5, .5); e.stun = Math.max(e.stun, .05); } } }
   if (hasN('tch_nap')) { g.np -= dt; if (g.np <= 0) { g.np = .3; const d = rand(70, rng * .95); if (g.fire.length < 30) g.fire.push({ x: mx + Math.cos(aim) * d + rand(-12, 12), y: my + Math.sin(aim) * d + rand(-12, 12), r: 38, life: 3, max: 3, tick: 0, dmg: 5 * M.gunDmg, sd: rand(0, 99) }); } } }
 function updGun(dt, best, bdist) {
   const g = G, M = g.M, gt = g.gt, GD = GUNS[gt], hs = g.haste(), rot = hasN('k_rot'), inR = !!best && bdist <= GD.range + best.r;
