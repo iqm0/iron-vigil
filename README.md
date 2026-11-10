@@ -24,7 +24,19 @@ Each keystone has two more steps (a branch upgrade, then a capstone). The level-
 
 ## The night
 
-Eight minutes, scripted. A trickle of skitters is punctuated by events with a radio warning: **runners** (fast, in lines), **spitters** (hold back and lob acid), **bloaters** (swell and burst; pop them at range, or next to a crowd), **elites** (armored, frenzied or volatile; bigger loot), and two **Hive Guardians** (charge with a red lane telegraph, summon, spit volleys). A guardian drops a free upgrade. Surges ring you in at set times.
+Eight minutes, scripted, and the bugs are tough: a basic skitter takes about a second of sustained gatling fire, and health scales with time. Every attack is telegraphed on the ground (each hazard type has its own dash pattern, not just a colour), and the attacker is **exposed** (yellow marker, +30% damage taken) after it commits.
+
+| Bug | Kit |
+|---|---|
+| **Skitter** | Swarms in a curve; **pounces** from range (red lane, then a lunge) and is exposed while it recovers |
+| **Runner** | Fast; bites and **retreats**, then comes back |
+| **Spitter** | Strafes at range, lobs acid ahead of you, **jumps back** when you close in |
+| **Burrower** | Digs under, travels hidden, then **bursts up** where you were heading (marked ring) |
+| **Shrieker** | Keeps its distance and **shrieks** (big ring) to speed up every bug in range; priority target |
+| **Bloater** | Swells and **bursts** (acid pool, hurts bugs too); pop it at range |
+| **Ravager** | Acid lobs, a telegraphed **ground slam**, and a frenzy under 40% health |
+| **Elites** | Armored, frenzied or volatile versions of any bug; bigger loot |
+| **Hive Guardian** | Two per night: **charge** lane, **ground slam**, **summons**, spit volleys, and **bile rain** below 66% health. Drops a free upgrade |
 
 ## Why come back
 
