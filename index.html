@@ -260,8 +260,8 @@ function getCell(cx, cy) {
   const n = 4 + Math.floor(hash(cx, cy, 1) * 4);
   for (let i = 0; i < n; i++) { const x = (cx + hash(cx, cy, 10 + i)) * CS, y = (cy + hash(cx, cy, 30 + i)) * CS, r = hash(cx, cy, 50 + i); c.d.push({ x, y, k: r < .4 ? 'peb' : r < .7 ? 'crack' : r < .9 ? 'tuft' : 'slab', s: hash(cx, cy, 70 + i), a: hash(cx, cy, 90 + i) * TAU }); }
   const far = Math.abs(cx) + Math.abs(cy) > 0, pr = hash(cx, cy, 3);
-  if (far && pr < .075) c.p.push({ k: 'barrel', x: (cx + .5) * CS, y: (cy + .5) * CS, s: hash(cx, cy, 4) * 99 });
-  else if (pr < .5) c.p.push({ k: 'rock', x: (cx + .2 + hash(cx, cy, 5) * .6) * CS, y: (cy + .2 + hash(cx, cy, 6) * .6) * CS, s: hash(cx, cy, 7) });
+  if (far && pr < .03) c.p.push({ k: 'barrel', x: (cx + .5) * CS, y: (cy + .5) * CS, s: hash(cx, cy, 4) * 99 });
+  else if (pr > .1 && pr < .5) c.p.push({ k: 'rock', x: (cx + .2 + hash(cx, cy, 5) * .6) * CS, y: (cy + .2 + hash(cx, cy, 6) * .6) * CS, s: hash(cx, cy, 7) });
   else if (pr < .72) c.p.push({ k: 'post', x: (cx + .2 + hash(cx, cy, 5) * .6) * CS, y: (cy + .2 + hash(cx, cy, 6) * .6) * CS, s: hash(cx, cy, 7) });
   cells.set(k, c); if (cells.size > 500) cells.delete(cells.keys().next().value); return c;
 }
