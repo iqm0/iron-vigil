@@ -223,7 +223,8 @@ function renderScene(S, W, H) {
   gl.useProgram(PROG.depth); gl.uniformMatrix4fv(PROG.depth.u.uVP, false, SVP); for (const m of meshes) if (m.n) { gl.bindVertexArray(m.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, m.count, m.n); }
   gl.disable(gl.POLYGON_OFFSET_FILL);
   // main pass
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); { const sk = i => Math.pow(1 - Math.exp(-S.fogC[i] * S.exposure), .4545); gl.clearColor(sk(0), sk(1), sk(2), 1); }       /* past the edge of the ground is haze, not black */
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shadowTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texGA); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texGN); gl.activeTexture(gl.TEXTURE0);
   gl.useProgram(PROG.ground); setLightUniforms(PROG.ground, S); gl.uniform1i(PROG.ground.u.uGA, 1); gl.uniform1i(PROG.ground.u.uGN, 2); gl.uniform3fv(PROG.ground.u.uCenter, S.focus); gl.uniform4fv(PROG.ground.u.uYard, S.yard || [-1e4, 1e4, -1e4, 1e4]); gl.uniform4fv(PROG.ground.u.uApron, S.apron || [0, 0, 0, 0]); gl.uniform4fv(PROG.ground.u.uTrack, S.track || [1e4, 0, 1e4, 0]); gl.bindVertexArray(groundVAO); gl.disable(gl.CULL_FACE); gl.drawArrays(gl.TRIANGLES, 0, 6);

@@ -176,13 +176,14 @@ function doBlast(b) { const g = G; for (const e of g.en) { if (e.dead) continue;
    It takes nine shells. Each one shoves it back half a metre and twists the struck shoulder away, but never stops a wind-up: only the ram does that.
    At a bit over half health it loses a blade, which spins off and sticks in the ground; at a quarter, the other.
    RAM while it circles: a third of its health, thrown four metres, a tumble. RAM during its wind-up: flipped on its back for 1.8 s, a blade snapped. RAM while it is stuck, down or under half: crushed. */
-const SHEAR = { hp: 410, tell: .72, lock: .34, pounce: .2, pv: 25, stuck: .9, dmg: 14 }, PLUM = [.08, .07, .115], PLUM2 = [.12, .1, .17], PLUMD = [.05, .042, .07], BLADEC = [.68, .62, .48];
-const SS = 1.25, SH_HOME = [[1.2, 1.0], [-1.2, 1.0], [1.2, -.95], [-1.2, -.95]], popc = a => (a & 1) + (a >> 1 & 1);
-function spawnShear(x, z, a) { const g = G, e = { shear: true, x, z, a, vx: 0, vz: 0, kx: 0, kz: 0, hp: SHEAR.hp, mhp: SHEAR.hp, s: 1.7, state: 'emerge', st: 1.5, cd: rand(1.4, 2.2), arms: 3, flinch: 0, fa: 0, pose: 0, strike: 0, flip: 0, bias: Math.random() < .5 ? -1 : 1, sprint: .8, pause: .4, ldx: 0, ldz: 1, la: 0, hitP: false, flash: 0, phase: Math.random(), legs: null, dead: false, stag: 0, emer: 0, big: false, locked: false }; g.en.push(e); return e; }
+const SHEAR = { hp: 410, tell: .9, lock: .9, pounce: .25, pv: 22, stuck: .9, dmg: 14 }, PLUM = [.08, .07, .115], PLUM2 = [.12, .1, .17], PLUMD = [.05, .042, .07], BLADEC = [.68, .62, .48];
+const CAMDEG = /[?&]camera=46(?:&|$)/.test(location.search) ? 46 : 38;       /* 38 degrees, 30 m back; ?camera=46 for comparison */
+const SS = .9375, SH_HOME = [[.9, .75], [-.9, .75], [.9, -.7125], [-.9, -.7125]], popc = a => (a & 1) + (a >> 1 & 1);
+function spawnShear(x, z, a) { const g = G, e = { shear: true, x, z, a, vx: 0, vz: 0, kx: 0, kz: 0, hp: SHEAR.hp, mhp: SHEAR.hp, s: 1.275, state: 'emerge', st: 1.5, cd: rand(1.4, 2.2), arms: 3, flinch: 0, fa: 0, pose: 0, strike: 0, flip: 0, bias: Math.random() < .5 ? -1 : 1, sprint: .8, pause: .4, ldx: 0, ldz: 1, la: 0, hitP: false, flash: 0, phase: Math.random(), legs: null, dead: false, stag: 0, emer: 0, big: false, locked: false }; g.en.push(e); return e; }
 function shearLose(e, dx, dz) { const g = G, c = Math.cos(e.a), sn = Math.sin(e.a), side = dx * c - dz * sn > 0 ? 2 : 1, bit = e.arms & side ? side : e.arms & 1 ? 1 : 2; if (!(e.arms & bit)) return; e.arms &= ~bit; const q = bit === 1 ? 1 : -1, bx = e.x + c * q * 1.2, bz = e.z - sn * q * 1.2;
   debris(MESH.blade, bx, 1.4, bz, 2.2, 2.4, 3.7, BLADEC, 0, dx * 5 + c * q * 4, 8, dz * 5 - sn * q * 4, .75); g.relics.push({ x: bx + dx * 3.2 + c * q * 2.6, z: bz + dz * 3.2 - sn * q * 2.6, rot: rand(0, TAU), t: -.72, life: 9 }); sparks(bx, 1.2, bz, dx, dz, 6, 1, .9, .7, 9); sfx.ric(); }       /* a blade shears off at the elbow, spins away and sticks upright where it lands */
 function hurtShear(e, dmg, dx, dz, ram, heavy) { const g = G; let crushed = false; e.flash = .09;
-  if (ram) { const open = e.state === 'stuck' || e.state === 'down' || e.hp < e.mhp * .5; if (g.dash) g.dash.slow = .45; if (ST.hitstop) g.freeze = Math.max(g.freeze, open ? .09 : .07); g.trauma = Math.min(1, g.trauma + .4 * FB); g.crouch.v += 6; dust(e.x, e.z, 8, 5, .6);
+  if (ram) { const open = e.state === 'stuck'; if (g.dash) g.dash.slow = .45; if (ST.hitstop) g.freeze = Math.max(g.freeze, open ? .09 : .07); g.trauma = Math.min(1, g.trauma + .4 * FB); g.crouch.v += 6; dust(e.x, e.z, 8, 5, .6);
     if (open) { e.hp = 0; crushed = true; } else if (e.state === 'tell') { e.state = 'down'; e.st = 1.8; e.cd = 1.2; e.hp -= e.mhp * .2; e.kx += dx * 12; e.kz += dz * 12; e.locked = false; shearLose(e, dx, dz); }
     else { e.hp -= e.mhp * .35; e.state = 'tumble'; e.st = .6; e.cd = 1.2; e.kx += dx * 28; e.kz += dz * 28; } }
   else { e.hp -= dmg * (e.state === 'down' ? 2 : e.state === 'stuck' ? 1.5 : 1); if (heavy) { e.kx += dx * 4.6; e.kz += dz * 4.6; e.flinch = .16; e.fa = dx * Math.cos(e.a) - dz * Math.sin(e.a) > 0 ? 1 : -1; sfx.thwack();
@@ -198,14 +199,14 @@ function updShear(e, dt) { const g = G, dx = g.x - e.x, dz = g.z - e.z, d = Math
   else if (e.state === 'stalk') { e.sprint -= dt; if (e.sprint < -e.pause) { e.sprint = rand(.7, 1.2); e.pause = rand(.3, .55); if (Math.random() < .3) e.bias = -e.bias; }
     if (e.sprint > 0) { const v = 5.6 * lame * ST.espd, rad = d > 7 ? 1 : d < 5 ? -.8 : 0, tan = rad ? .5 : 1; mvx = (ux * rad - uz * e.bias * tan) * v; mvz = (uz * rad + ux * e.bias * tan) * v; }
     let busy = 0; for (const o of g.en) if (o.shear && (o.state === 'tell' || o.state === 'pounce')) busy++;
-    if (d < 8.2 && e.cd <= 0 && busy < g.enc.cap && !g.dead && !g.won && !g.demo) { e.state = 'tell'; e.st = SHEAR.tell; e.locked = false; sfx.tell(); } }
+    if (d < 7.8 && e.cd <= 0 && busy < g.enc.cap && !g.dead && !g.won && !g.demo) { e.state = 'tell'; e.st = SHEAR.tell; e.locked = false; sfx.tell(); if (e.z > g.z + 3) cap('Attack from behind.', 1.6); } }
   else if (e.state === 'tell') { turn = 9; if (!e.locked && e.st <= SHEAR.lock) { e.locked = true; const px = g.x + g.vx * .1 - e.x, pz = g.z + g.vz * .1 - e.z, l = Math.hypot(px, pz) || 1; e.ldx = px / l; e.ldz = pz / l; e.la = Math.atan2(e.ldx, e.ldz); } if (e.locked) face = e.la;
     if (e.st <= 0) { e.state = 'pounce'; e.st = SHEAR.pounce; e.hitP = false; sfx.lunge(); } }
-  else if (e.state === 'pounce') { face = e.la; turn = 30; mvx = e.ldx * SHEAR.pv; mvz = e.ldz * SHEAR.pv; e.vx = mvx; e.vz = mvz; const al = dx * e.ldx + dz * e.ldz, lat = Math.abs(dx * e.ldz - dz * e.ldx); if (!e.hitP && al > -1 && al < 5 && lat < 1.75) { e.hitP = true; hurtPlayer(popc(e.arms) ? SHEAR.dmg : 10, e.ldx, e.ldz); } if (al < 4.7 && al > 0 && lat < 2.4) {       /* it hits what is on its line, and only that: one step to the side is enough */ e.vx = e.vz = mvx = mvz = 0; e.st = Math.min(e.st, .03); }
+  else if (e.state === 'pounce') { face = e.la; turn = 30; mvx = e.ldx * SHEAR.pv; mvz = e.ldz * SHEAR.pv; e.vx = mvx; e.vz = mvz; const al = dx * e.ldx + dz * e.ldz, lat = Math.abs(dx * e.ldz - dz * e.ldx); if (!e.hitP && al > -.7 && al < 4.0 && lat < 1.2) { e.hitP = true; hurtPlayer(popc(e.arms) ? SHEAR.dmg : 10, e.ldx, e.ldz); } if (al < 3.8 && al > 0 && lat < 1.7) {       /* it hits what is on its line, and only that: one step to the side is enough */ e.vx = e.vz = mvx = mvz = 0; e.st = Math.min(e.st, .03); }
     if (e.st <= 0) { e.state = 'stuck'; e.st = popc(e.arms) ? SHEAR.stuck : .5; e.vx = e.vz = 0; dust(e.x + e.ldx * 2, e.z + e.ldz * 2, 6, 3, .4); if (popc(e.arms)) { sparks(e.x + e.ldx * 2.6, .1, e.z + e.ldz * 2.6, -e.ldx, -e.ldz, 6, 1, .85, .6, 8); mark(e.x + e.ldx * 2.4, e.z + e.ldz * 2.4, .12, 1.0, e.la, 2, 0, 0, 0, .5, 8); } } }
   else { face = e.a; if (e.st <= 0) { e.cd = Math.max(e.cd, rand(2.4, 3.4)); e.state = 'stalk'; e.sprint = .9; } }       /* stuck, tumbling, or on its back */
   e.stag = e.state === 'stuck' || e.state === 'down' ? Math.max(.01, e.st) : 0;
-  const k = 1 - Math.exp(-dt * 9); e.vx += (mvx - e.vx) * k; e.vz += (mvz - e.vz) * k; const kd = Math.exp(-dt * 7); e.kx *= kd; e.kz *= kd; e.x += (e.vx + e.kx) * dt; e.z += (e.vz + e.kz) * dt; pushOut(e, 1.1); e.a += clamp(angDiff(e.a, face), -turn * dt, turn * dt);
+  const k = 1 - Math.exp(-dt * 9); e.vx += (mvx - e.vx) * k; e.vz += (mvz - e.vz) * k; const kd = Math.exp(-dt * 7); e.kx *= kd; e.kz *= kd; e.x += (e.vx + e.kx) * dt; e.z += (e.vz + e.kz) * dt; pushOut(e, .85); e.a += clamp(angDiff(e.a, face), -turn * dt, turn * dt);
   e.pose += ((e.state === 'tell' ? 1 : 0) - e.pose) * Math.min(1, dt * (e.state === 'tell' ? 7 : 12)); e.strike += ((e.state === 'pounce' || e.state === 'stuck' ? 1 : 0) - e.strike) * Math.min(1, dt * (e.state === 'pounce' ? 26 : 7)); e.flip += ((e.state === 'down' ? 1 : 0) - e.flip) * Math.min(1, dt * 9);
   /* four planted feet, stepping in diagonal pairs */
   const c = Math.cos(e.a), sn = Math.sin(e.a), sp = Math.hypot(e.vx, e.vz), home = (i, o) => { const h = SH_HOME[i]; o[0] = e.x + h[0] * c + h[1] * sn + (sp > .6 ? e.vx / sp * .4 : 0); o[1] = e.z - h[0] * sn + h[1] * c + (sp > .6 ? e.vz / sp * .4 : 0); return o; };
@@ -429,7 +430,13 @@ function die() { const g = G; g.hp = 0; g.dead = .001; g.dash = null; g.boom = 1
   for (let i = 0; i < 16; i++) debris(MESH.cube, g.x + rand(-.5, .5), rand(1.6, 2.8), g.z + rand(-.5, .5), rand(.2, .8), rand(.15, .5), rand(.2, .8), Math.random() < .6 ? YEL : DRK, 0, rand(-9, 9), rand(5, 14), rand(-9, 9), rand(3, 5));
   for (let i = 0; i < 40; i++) { const a = rand(0, TAU), s = rand(2, 13); part(0, g.x, rand(1.5, 2.6), g.z, Math.sin(a) * s, rand(1, 9), Math.cos(a) * s, rand(.4, 1), rand(.6, 1.6), 1, rand(.4, .7), .12, 1, 6, 2, -.6); } dust(g.x, g.z, 16, 7, .8); }
 function startDash(dx, dz) { const g = G; if (!g || g.dash || g.dcd > 0 || g.dead || g.demo || state !== 'play') return; const l = Math.hypot(dx, dz); if (l < .01) { dx = Math.sin(g.head); dz = Math.cos(g.head); } else { dx /= l; dz /= l; }
-  const B = DASH.burst * (g.s.chain ? 1.5 : 1); g.dash = { t: 0, dx, dz, hit: new Set(), skidded: false, B, back: false }; g.dcd = g.s.dashCd; g.inv = Math.max(g.inv, DASH.wind + B); g.crouch.v += 5.5; g.fov.v += 1.2; g.trauma = Math.min(1, g.trauma + (.22) * FB); sfx.dash();
+  // Add the 2m closing step only when the target is pinned, close enough, and in front.
+  // A poorly aimed flick or mistimed ram gets no automatic reach correction.
+  const target = g.tgt && g.tgt.shear && g.tgt.state === 'stuck' && !g.tgt.dead ? g.tgt : null;
+  const tx = target ? target.x - g.x : 0, tz = target ? target.z - g.z : 0;
+  const ahead = target && (tx * dx + tz * dz) / (Math.hypot(tx, tz) || 1) > .87;
+  const close = ahead && Math.hypot(tx, tz) >= 5 && Math.hypot(tx, tz) <= 8.4;
+  const B = DASH.burst * (g.s.chain ? 1.5 : 1) + (close ? 2 / DASH.v : 0); g.dash = { t: 0, dx, dz, hit: new Set(), skidded: false, B, back: false }; g.dcd = g.s.dashCd; g.crouch.v += 5.5; g.fov.v += 1.2; g.trauma = Math.min(1, g.trauma + (.22) * FB); sfx.dash();
   dust(g.x, g.z, 14, 6, .55); mark(g.x, g.z, 1.7, 1.7, 0, 0, 0, 0, 0, .55, 9); }
 function stomp(f, side) { const g = G; g.bob.v -= 3.4; g.roll.v += side * 1.8; g.trauma = Math.min(1, g.trauma + (.035) * FB); dust(f.x, f.z, 3, 1.8, .3); if (!g.demo) sfx.step();
   mark(f.x + Math.sin(f.a) * .1, f.z + Math.cos(f.a) * .1, .24, .44, f.a, 2, 0, 0, 0, .3, 10); { const c = Math.cos(g.aim), sn = Math.sin(g.aim), q = side * .4; part(1, g.x + q * c - .84 * sn, g.py + 2.1, g.z - q * sn - .84 * c, rand(-.3, .3), rand(2, 3), rand(-.3, .3), .8, .2, .2, .2, .21, .35, 0, 1.2, .7); }      // a print on the pad and a chuff from the stack
@@ -756,8 +763,8 @@ function render() { const g = G; if (!GLOK) return; const fires = [];
   if (g.fires.length) { const f = g.fires[g.fires.length >> 1], k = Math.min(1, f.t); L.push({ p: [f.x, 1.3, f.z], c: [3.6 * k, 1.5 * k, .4 * k], r: 9 }); }
   let nd = null; for (const d of g.drops) if (d.k !== 'fix' && (!nd || (d.x - g.x) ** 2 + (d.z - g.z) ** 2 < (nd.x - g.x) ** 2 + (nd.z - g.z) ** 2)) nd = d; if (nd && L.length < 5) { const c = nd.k === 'organ' ? [.6, .9, .15] : [1, .68, .12]; L.push({ p: [nd.x, 1.6, nd.z], c: [c[0] * 1.6, c[1] * 1.6, c[2] * 1.6], r: 6 }); }
   fires.sort((a, b) => (a.far ? -1e6 : (a.x - g.x) ** 2 + (a.z - g.z) ** 2) - (b.far ? -1e6 : (b.x - g.x) ** 2 + (b.z - g.z) ** 2)); for (const p of fires) { if (L.length >= 6) break; if (p.k === 'lamp') { L.push({ p: [p.x, p.y, p.z], c: p.c, r: p.r }); continue; } if (p.k === 'pole') { const on = poleOn(p, g.t); if (on > .05) L.push({ p: [p.x + Math.cos(p.rot) * 1, 4.6, p.z - Math.sin(p.rot) * 1], c: [1.5 * on, 1.9 * on, 2.5 * on], r: 11 }); continue; } const fl = .85 + Math.sin(g.t * 13 + p.v * 20) * .1 + Math.sin(g.t * 31 + p.v * 7) * .06; L.push({ p: [p.x, 1.9, p.z], c: [5.2 * fl, 2.1 * fl, .5 * fl], r: 12.5 }); }
-  const sh = g.trauma * g.trauma * ST.shake, tt = performance.now() / 1000 * 32, d = 21 * g.cam.d, P = 50 * Math.PI / 180, sx = sh * .55 * shakeN(tt, 1), sz = sh * .55 * shakeN(tt, 2);
-  const kx = g.ck.x * Math.min(1, ST.shake), kz = g.ck.z * Math.min(1, ST.shake); SC.cam[0] = g.cam.x + sx + kx; SC.cam[1] = Math.sin(P) * d; SC.cam[2] = g.cam.z + Math.cos(P) * d + sz + kz; SC.at[0] = g.cam.x + sx * .6 + sh * .3 * shakeN(tt, 3) + kx; SC.at[1] = 1.2; SC.at[2] = g.cam.z - 1.8 * g.cam.d + sz * .6 + kz; SC.fov = 1.15 + g.fov.x * .09;
+  const sh = g.trauma * g.trauma * ST.shake, tt = performance.now() / 1000 * 32, d = 30 * g.cam.d, P = CAMDEG * Math.PI / 180, la = (CAMDEG === 46 ? 6.75 : 7.5) * g.cam.d, sx = sh * .55 * shakeN(tt, 1), sz = sh * .55 * shakeN(tt, 2);
+  const kx = g.ck.x * Math.min(1, ST.shake), kz = g.ck.z * Math.min(1, ST.shake); SC.cam[0] = g.cam.x + sx + kx; SC.cam[1] = Math.sin(P) * d; SC.cam[2] = g.cam.z - la + Math.cos(P) * d + sz + kz; SC.at[0] = g.cam.x + sx * .6 + sh * .3 * shakeN(tt, 3) + kx; SC.at[1] = 0; SC.at[2] = g.cam.z - la + sz * .6 + kz;       /* the camera looks at the ground ahead of the walker, which puts the walker low in the frame and above the thumbs */ SC.fov = 1.15 + g.fov.x * .09;
   SC.focus[0] = g.x; SC.focus[2] = g.z; SC.spotP = g.lampP; const ld = g.lampD, ll = Math.hypot(ld[0], ld[1], ld[2]) || 1; SC.spotD[0] = ld[0] / ll; SC.spotD[1] = ld[1] / ll; SC.spotD[2] = ld[2] / ll;
   const sr = g.s.focus, lk = on * (1 - (ST.flash ? .15 : .55) * g.dip) /* a hit makes the lamp dip for a moment */; SC.spotC[0] = (sr ? 5 : 3.0) * lk; SC.spotC[1] = (sr ? 4.4 : 2.7) * lk; SC.spotC[2] = (sr ? 3.5 : 2.2) * lk; SC.spotCos[0] = sr ? .87 : .74; SC.spotCos[1] = sr ? .955 : .92; SC.spotFov = sr ? 1.2 : 1.62; SC.ambS[0] = .018 + br * .13; SC.ambS[1] = .028 + br * .14; SC.ambS[2] = .044 + br * .17; SC.ambG[0] = SC.ambG[1] = SC.ambG[2] = .01 + br * .055; SC.moonC[0] = .09 + br * .11; SC.moonC[1] = .14 + br * .11; SC.moonC[2] = .23 + br * .12; SC.fogR[0] = 17 + br * 14; SC.fogR[1] = 40 + br * 20; SC.yard = YARDV; SC.apron = APRONV; SC.track = TRACKV;
   renderScene(SC, glc.width, glc.height); hud();
@@ -774,6 +781,15 @@ function hud() { const g = G; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearR
   if (g.hurtT > 0 || g.hp < 30) { const a = Math.max(g.hurtT * (ST.flash ? .22 : .4), g.hp < 30 && !g.dead ? .18 + (ST.flash ? 0 : Math.sin(g.t * 6) * .06) : 0), gr = ctx.createRadialGradient(W / 2, H / 2, H * .43, W / 2, H / 2, H * .72);       /* red at the edges of the screen only: it must not tint the fight */ gr.addColorStop(0, 'rgba(200,20,10,0)'); gr.addColorStop(1, `rgba(200,20,10,${a})`); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
   // a swarm is coming: the dark at that edge of the screen turns red for a few seconds
   for (const c of g.cues) { const ux = Math.sin(c.a), uy = Math.cos(c.a), t = Math.min(ux ? (W / 2) / Math.abs(ux) : 1e9, uy ? (H / 2) / Math.abs(uy) : 1e9), ex = W / 2 + ux * t, ey = H / 2 + uy * t, k = Math.min(1, c.t) * Math.min(1, (3.4 - c.t) * 3) * (ST.flash ? .8 : .75 + Math.sin(performance.now() / 160) * .25), gr = ctx.createRadialGradient(ex, ey, 0, ex, ey, W * .42); gr.addColorStop(0, `rgba(255,40,20,${(hc ? .6 : .38) * k})`); gr.addColorStop(1, 'rgba(255,40,20,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
+  /* A wind-up from behind the walker is under the thumbs, so it is repeated above them. Behind means toward the bottom of the screen, not behind the walker's heading.
+     The controls cover the ground from about 4 m back; an animal centred 3 m back already has most of its body under them. */
+  const rearTell = g.en.some(e => e.shear && e.state === 'tell' && e.locked && e.z > g.z + 3);
+  if (rearTell) { ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 ${Math.round(13 * Math.min(ts, 1.5))}px ${FONT}`;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#43140e'; ctx.lineWidth = 4;
+    const wx = W / 2, wy = H * .725;       /* below the walker's feet, above the controls */
+    ctx.strokeText('REAR ATTACK', wx, wy); ctx.fillText('REAR ATTACK', wx, wy);
+    ctx.restore(); }
   for (const d of g.drops) { if (d.k === 'fix') continue; const sc = toScr(d.x, .8, d.z); if (sc && sc[0] > 10 && sc[0] < W - 10 && sc[1] > SAFE + 44 && sc[1] < H - 10) continue;       // salvage or an organ lying off screen: a diamond at the edge with an arrow toward it
     const col = d.k === 'organ' ? '#b6e04a' : '#f2b01e', dx = d.x - g.x, dy = d.z - g.z, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, m = 26, t = Math.min(ux > 0 ? (W - m - W / 2) / ux : ux < 0 ? (m - W / 2) / ux : 1e9, uy > 0 ? (H - m - H / 2) / uy : uy < 0 ? (SAFE + 70 - H / 2) / uy : 1e9), bob = ST.flash ? 0 : Math.sin(performance.now() / 200) * 3;
     ctx.save(); ctx.translate(W / 2 + ux * (t + bob), H / 2 + uy * (t + bob)); ctx.rotate(Math.atan2(uy, ux)); ctx.scale(1.2, 1.2); ctx.lineJoin = 'round'; ctx.fillStyle = col; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 2;
@@ -865,7 +881,15 @@ $('preVis').onclick = () => preset({ contrast: true, bright: .4, text: 1.25, num
 $('preReset').onclick = () => { ST = defaultSettings(); settingsChanged(); buildSettings(); announce('Settings reset to device defaults'); };
 
 /* ---------- input: one thumb to walk, a button to dash (tap it, or drag it to aim) ---------- */
-function dashAuto() { const g = G; if (stick && (stick.dx || stick.dy)) startDash(stick.dx, stick.dy); else if (Math.hypot(g.vx, g.vz) > 1) startDash(g.vx, g.vz); else startDash(0, 0); }
+function dashAuto() { const g = G;
+  // A tap attacks the tracked threat, regardless of where the movement thumb rests.
+  // Only a directional flick on the ram button overrides this aim.
+  if (g.tgt && !g.tgt.dead) {
+    const dx = g.tgt.x - g.x, dz = g.tgt.z - g.z;
+    if (Math.hypot(dx, dz) > .2) { startDash(dx, dz); return; }
+  }
+  startDash(Math.sin(g.gunA), Math.cos(g.gunA));
+}
 function keyDash() { let ix = 0, iz = 0; if (keys.w || keys.arrowup) iz -= 1; if (keys.s || keys.arrowdown) iz += 1; if (keys.a || keys.arrowleft) ix -= 1; if (keys.d || keys.arrowright) ix += 1; if (ix || iz) startDash(ix, iz); else dashAuto(); }
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); keys[k] = true; if (state === 'play' && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
   if ((k === 'shift' || k === ' ') && state === 'play' && !e.repeat) keyDash();
@@ -886,7 +910,11 @@ cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(), 
   if (d > RM) { if (ST.fixed) { dx = dx / d * RM; dy = dy / d * RM; } else { stick.ox += dx / d * (d - RM); stick.oy += dy / d * (d - RM); dx = x - stick.ox; dy = y - stick.oy; } d = Math.hypot(dx, dy) || 1; }
   const on = d > ST.dead ? 1 : 0, ux = dx / (d || 1), uy = dy / (d || 1); stick.dx = ux * on; stick.dy = uy * on; stick.ux = ux; stick.uy = uy; stick.d = d; });
 const endPtr = e => { if (dbtn && e.pointerId === dbtn.id) { if (!dbtn.used && state === 'play') { if (dbtn.d > 14) startDash(dbtn.ux, dbtn.uy); else dashAuto(); } dbtn = null; return; } if (stick && e.pointerId === stick.id) stick = null; };
-cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr); cv.addEventListener('contextmenu', e => e.preventDefault());
+const cancelPtr = e => { // OS interruption is not a tap; never fire a ram on pointercancel.
+  if (dbtn && e.pointerId === dbtn.id) dbtn = null;
+  if (stick && e.pointerId === stick.id) stick = null;
+};
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', cancelPtr); cv.addEventListener('contextmenu', e => e.preventDefault());
 
 /* ---------- loop ---------- */
 let emaDt = 16.7, lastQ = 0, fpsN = 0, fpsT = 0; const fpsEl = $('fps'), showFps = /[?&]fps/.test(location.search); if (showFps) fpsEl.style.display = 'block';
@@ -899,7 +927,7 @@ function frame(now) {
 }
 /* hooks for automated checks: step the game by a fixed amount and read its state as text */
 window.advanceTime = ms => { for (let t = 0; t < ms; t += 1000 / 60) step(1 / 60); render(); };
-window.render_game_to_text = () => { const g = G; return JSON.stringify({ state, seed: SEED, drawn: STATS, items: g.items, choices: g.choices, offer: offer ? offer.cards.map(c => c.id) : null, closed: g.closed, drops: g.drops.length, t: +g.t.toFixed(2), hp: Math.round(g.hp), kills: g.kills, pos: [+g.x.toFixed(2), +g.z.toFixed(2)], vel: [+g.vx.toFixed(2), +g.vz.toFixed(2)], dash: g.dash ? +g.dash.t.toFixed(2) : null, dashCd: +Math.max(0, g.dcd).toFixed(2), target: !!g.tgt, bugs: g.en.map(e => ({ x: +e.x.toFixed(1), z: +e.z.toFixed(1), st: e.state, hp: Math.round(e.hp) })) }); };
+window.render_game_to_text = () => { const g = G; return JSON.stringify({ state, seed: SEED, drawn: STATS, items: g.items, choices: g.choices, offer: offer ? offer.cards.map(c => c.id) : null, closed: g.closed, drops: g.drops.length, t: +g.t.toFixed(2), hp: Math.round(g.hp), kills: g.kills, pos: [+g.x.toFixed(2), +g.z.toFixed(2)], vel: [+g.vx.toFixed(2), +g.vz.toFixed(2)], dash: g.dash ? +g.dash.t.toFixed(2) : null, dashCd: +Math.max(0, g.dcd).toFixed(2), target: !!g.tgt, cameraElevation: CAMDEG, stalkerScale: SS / 1.25, bugs: g.en.map(e => ({ x: +e.x.toFixed(1), z: +e.z.toFixed(1), st: e.state, hp: Math.round(e.hp) })) }); };
 
 applySettings(); resize(); newGame(true); titleInfo(); cv.style.visibility = 'hidden';
 try { GLOK = initGL(glc); } catch (e) { GLOK = false; console.error(e); }
