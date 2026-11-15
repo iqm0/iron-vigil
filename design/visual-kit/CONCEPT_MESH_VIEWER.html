@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>LAST LIGHT — Procedural Asset Concept Lab</title>
+<style>
+:root{color-scheme:dark;--ink:#eef0e9;--muted:#9ca3a3;--line:#343d3d;--signal:#e8ab36;--bg:#111719}
+*{box-sizing:border-box} body{margin:0;background:#101617;color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.shell{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:100dvh}.aside{padding:24px;max-height:100dvh;overflow:auto;background:#141c1e;border-right:1px solid var(--line)}
+.eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--signal);font-weight:800}.aside h1{font-size:29px;line-height:1.04;letter-spacing:-.04em;margin:10px 0 12px}.aside p{color:#adb5b2;margin:0 0 22px;font-size:13px;line-height:1.5}.label{font-weight:700;color:#c4caca;font-size:11px;text-transform:uppercase;letter-spacing:.09em;margin:18px 0 7px;display:block}
+select,button,input{font:inherit}select,button{width:100%;padding:11px 12px;border-radius:8px;background:#222d2e;color:#fff;border:1px solid #465452}button{cursor:pointer;text-align:left}button:hover{background:#35403f}.views{display:flex;gap:6px}.views button{text-align:center;font-size:12px}.views button.on{background:#6c4a1b;border-color:#d58e27}.inline{display:flex;gap:10px;align-items:center;padding:13px 0}input{accent-color:#e8ab36}.note{margin-top:24px;border-top:1px solid #354242;padding-top:18px;color:#b5bdba;font-size:12px}.note strong{color:var(--ink)}.note code{font-size:11px;color:#ffd58d}.note a{color:#edbe66}.stage{position:relative;overflow:hidden;background:radial-gradient(ellipse 70% 50% at 50% 56%,#283234,#11191d 80%);height:100dvh;min-height:540px}
+canvas{width:100%;height:100%;display:block;touch-action:none}.head{position:absolute;top:26px;left:32px;right:25px;pointer-events:none}.head b{display:block;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:#b2bbb9}.head h2{font-size:35px;letter-spacing:-.045em;line-height:1.1;margin:5px 0 7px}.head p{margin:0;color:#a7b2b0;max-width:650px}.bottom{position:absolute;bottom:27px;left:30px;right:30px;display:flex;justify-content:space-between;gap:10px;color:#a4aeab;font-size:11px;pointer-events:none}.pill{background:#141e21b8;border:1px solid #3e4e51;padding:6px 9px;border-radius:999px}.badge{color:#eabb6e}.legend{margin-top:18px;display:flex;flex-wrap:wrap;gap:9px}.legend span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#b5bfbc}.dot{height:9px;width:9px;border-radius:2px;display:inline-block}
+@media(max-width:800px){.shell{grid-template-columns:1fr;grid-template-rows:minmax(500px,64dvh) auto}.aside{grid-row:2;max-height:none;padding:19px 20px 32px}.stage{grid-row:1;height:64dvh;min-height:500px}.head{top:17px;left:18px}.head h2{font-size:26px}.bottom{bottom:14px;left:18px;right:18px}.aside h1{font-size:23px}.note{margin-top:15px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="aside"><div class="eyebrow">LAST LIGHT / VISUAL PRODUCTION</div><h1>Procedural<br/>Mesh Lab</h1><p>Original 3D blockout concepts. All geometry is generated in JavaScript and rendered using vanilla WebGL2 — no Three.js, textures, imported models or external assets.</p>
+<label class="label" for="asset">Asset / encounter</label>
+<select id="asset">
+<option value="mech">RECLAIMER-01 — industrial walker</option>
+<option value="stalker">HOOKRUNNER — stalker</option>
+<option value="spitter">ACID CARRIER — spitter</option>
+<option value="guard">BULWARK — brood guard</option>
+<option value="mother">CATHEDRAL — brood mother</option>
+<option value="cannon">BREACH CANNON — main gun</option>
+<option value="mortar">SHOULDER MORTAR — support</option>
+<option value="world">FACILITY 09 — environment blockout</option>
+</select>
+<label class="label">View</label><div class="views"><button class="on" data-view="3d">3/4</button><button data-view="top">Top-down</button><button data-view="front">Front</button></div>
+<div class="inline"><label><input type="checkbox" id="sil"/> Silhouette test</label><label><input type="checkbox" id="grid" checked/> Grid</label></div>
+<div class="legend"><span><i class="dot" style="background:#d9982b"></i> Human industry</span><span><i class="dot" style="background:#26332c"></i> Alien carapace</span><span><i class="dot" style="background:#93ad54"></i> Organic organ</span></div>
+<div class="note"><strong>Use:</strong> drag to rotate, scroll/pinch to zoom. Switch to <strong>Top-down</strong> and <strong>Silhouette</strong> to test recognition at gameplay scale.<br/><br/><strong>Important:</strong> this is a <em>standalone concept viewer</em> with new procedural mesh generation. It is <strong>not</strong> an integrated patch to the game. The production implementation should reuse the game's <code>meshBuilder → makeMesh → draw / seg / ik2</code> pipeline described in the companion technical guide.</div>
+</aside>
+<main class="stage"><canvas id="view"></canvas><div class="head"><b>BLOCKOUT CONCEPT · WEBGL2</b><h2 id="name">RECLAIMER-01</h2><p id="desc">A repurposed heavy agricultural walker with a vulnerable cabin, articulated cannon and crushing ram.</p></div><div class="bottom"><span class="pill">100% PROCEDURAL · NO ASSET IMPORTS</span><span class="pill badge" id="ninfo">—</span></div></main>
+</div>
+<script>
+'use strict';
+const canvas = document.getElementById('view');
+const gl = canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true});
+if(!gl){document.querySelector('.head').innerHTML='<h2>WebGL2 not available</h2><p>Use a recent browser with WebGL2 enabled.</p>';throw new Error('WebGL2 unavailable');}
+const vs=`#version 300 es
+layout(location=0) in vec3 aP; layout(location=1) in vec3 aN;
+uniform mat4 uM,uVP;out vec3 vN;out vec3 vP;void main(){vec4 p=uM*vec4(aP,1.);gl_Position=uVP*p;vP=p.xyz;vN=normalize(mat3(uM)*aN);}`;
+const fs=`#version 300 es
+precision highp float;in vec3 vN,vP;uniform vec3 uC,uEye;uniform float uSil;out vec4 frag;
+void main(){vec3 n=normalize(vN);float l=max(0.,dot(n,normalize(vec3(-.6,1.1,1.2))));float rim=pow(1.-abs(dot(n,normalize(uEye-vP))),3.);vec3 c=uSil>.5?vec3(.85,.88,.84):uC*(.39+.60*l)+rim*vec3(.045,.055,.06);frag=vec4(c,1.);}`;
+function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,vs));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+const uM=gl.getUniformLocation(p,'uM'),uVP=gl.getUniformLocation(p,'uVP'),uC=gl.getUniformLocation(p,'uC'),uEye=gl.getUniformLocation(p,'uEye'),uSil=gl.getUniformLocation(p,'uSil');
+const C={yellow:'#d9982b',gold:'#edb345',darkYellow:'#9b671d',steel:'#596268',steelLight:'#a0a7a4',metal:'#333c42',dark:'#20282c',glass:'#172f36',piston:'#c8c6ac',black:'#171d1d',chitin:'#27312b',chitin2:'#485144',bone:'#c4b69a',organ:'#93ad54',blood:'#7c4d42',emission:'#b8d791',soil:'#333932',ground:'#252e30',grid:'#384548',rust:'#70452b',wire:'#776344'};
+const rgb=h=>[1,3,5].map(n=>parseInt(h.slice(n,n+2),16)/255);
+function geometry(){return {P:[],N:[]};}
+function tri(g,a,b,c){let ax=b[0]-a[0],ay=b[1]-a[1],az=b[2]-a[2],bx=c[0]-a[0],by=c[1]-a[1],bz=c[2]-a[2];let n=[ay*bz-az*by,az*bx-ax*bz,ax*by-ay*bx];let d=Math.hypot(...n)||1;n=n.map(x=>x/d);g.P.push(...a,...b,...c);g.N.push(...n,...n,...n);}
+function quad(g,a,b,c,d){tri(g,a,b,c);tri(g,a,c,d);}
+function cuboid(){let g=geometry(),h=.5;let v=[[-h,-h,-h],[h,-h,-h],[h,h,-h],[-h,h,-h],[-h,-h,h],[h,-h,h],[h,h,h],[-h,h,h]];
+for(let f of [[0,3,2,1],[4,5,6,7],[1,2,6,5],[0,4,7,3],[3,7,6,2],[0,1,5,4]])quad(g,...f.map(i=>v[i]));return g;}
+function prismXZ(pts,hi=.5,lo=-.5){let g=geometry(),sgn=pts.reduce((a,q,i)=>{let r=pts[(i+1)%pts.length];return a+q[0]*r[1]-r[0]*q[1]},0);if(sgn<0)pts=[...pts].reverse();let v=(p,y)=>[p[0],y,p[1]];for(let i=1;i<pts.length-1;i++){tri(g,v(pts[0],hi),v(pts[i+1],hi),v(pts[i],hi));tri(g,v(pts[0],lo),v(pts[i],lo),v(pts[i+1],lo));}for(let i=0;i<pts.length;i++){let j=(i+1)%pts.length;quad(g,v(pts[i],lo),v(pts[i],hi),v(pts[j],hi),v(pts[j],lo));}return g;}
+function cylinder(n=12,rt=1){let g=geometry(),r=.5;for(let i=0;i<n;i++){let a=i*Math.PI*2/n,b=(i+1)*Math.PI*2/n,A=[Math.cos(a)*r,-.5,Math.sin(a)*r],B=[Math.cos(b)*r,-.5,Math.sin(b)*r],D=[Math.cos(a)*r*rt,.5,Math.sin(a)*r*rt],E=[Math.cos(b)*r*rt,.5,Math.sin(b)*r*rt];if(rt>0)quad(g,D,E,B,A);else tri(g,[0,.5,0],B,A);tri(g,[0,-.5,0],A,B);if(rt>0)tri(g,[0,.5,0],E,D);}return g;}
+function sphere(n=10,m=7){let g=geometry(),v=(i,j)=>{let a=i*2*Math.PI/n,t=j*Math.PI/m;return [.5*Math.sin(t)*Math.cos(a),.5*Math.cos(t),.5*Math.sin(t)*Math.sin(a)]};for(let i=0;i<n;i++)for(let j=0;j<m;j++){let a=v(i,j),b=v(i+1,j),c=v(i+1,j+1),d=v(i,j+1);if(j>0)tri(g,a,b,c);if(j<m-1)tri(g,a,c,d);}return g;}
+const entries={box:cuboid(),cyl:cylinder(12),cone:cylinder(10,0),egg:sphere(10,8),wedge:prismXZ([[-.5,-.45],[.5,-.45],[.64,.18],[.35,.5],[-.35,.5],[-.64,.18]]),
+ shield:prismXZ([[-.5,-.48],[.5,-.48],[.58,.1],[.28,.5],[-.28,.5],[-.58,.1]],.25,-.25),
+ spear:prismXZ([[-.15,-.5],[.15,-.5],[.12,.12],[0,.5],[-.12,.12]],.18,-.18),
+ rib:prismXZ([[-.43,-.5],[.43,-.5],[.48,.2],[.24,.5],[-.24,.5],[-.48,.2]],.23,-.23)};
+const gpu={};for(let [k,g] of Object.entries(entries)){let vao=gl.createVertexArray();gl.bindVertexArray(vao);let b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(g.P),gl.STATIC_DRAW);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(0);let n=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,n);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(g.N),gl.STATIC_DRAW);gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(1);gpu[k]={vao,n:g.P.length/3};}gl.bindVertexArray(null);
+const I=()=>{let m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m;};
+function mul(a,b){let o=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)o[c*4+r]=a[r]*b[c*4]+a[r+4]*b[c*4+1]+a[r+8]*b[c*4+2]+a[r+12]*b[c*4+3];return o;}
+function tr(x,y,z){let m=I();m[12]=x;m[13]=y;m[14]=z;return m;}function sc(x,y,z){let m=I();m[0]=x;m[5]=y;m[10]=z;return m;}
+function rx(a){let m=I(),c=Math.cos(a),s=Math.sin(a);m[5]=c;m[6]=s;m[9]=-s;m[10]=c;return m;}
+function ry(a){let m=I(),c=Math.cos(a),s=Math.sin(a);m[0]=c;m[2]=-s;m[8]=s;m[10]=c;return m;}
+function rz(a){let m=I(),c=Math.cos(a),s=Math.sin(a);m[0]=c;m[1]=s;m[4]=-s;m[5]=c;return m;}
+function lookAt(eye,at){let z=eye.map((v,i)=>v-at[i]),ln=Math.hypot(...z);z=z.map(a=>a/ln);let x=[z[2],0,-z[0]],lx=Math.hypot(...x);x=x.map(a=>a/lx);let y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]];let m=I();m[0]=x[0];m[1]=y[0];m[2]=z[0];m[4]=x[1];m[5]=y[1];m[6]=z[1];m[8]=x[2];m[9]=y[2];m[10]=z[2];m[12]=-x.reduce((s,a,i)=>s+a*eye[i],0);m[13]=-y.reduce((s,a,i)=>s+a*eye[i],0);m[14]=-z.reduce((s,a,i)=>s+a*eye[i],0);return m;}
+function perspective(fovy,aspect,near,far){let f=1/Math.tan(fovy/2),m=new Float32Array(16);m[0]=f/aspect;m[5]=f;m[10]=(far+near)/(near-far);m[11]=-1;m[14]=2*far*near/(near-far);return m;}
+let shapes=[],stack=[I()],partCount=0;
+function push(m){stack.push(mul(stack.at(-1),m));}function pop(){stack.pop();}function xyz(x,y,z){push(tr(x,y,z));}
+function part(shape,x,y,z,sx,sy,sz,c, yaw=0, pitch=0, roll=0){let m=mul(stack.at(-1),mul(tr(x,y,z),mul(ry(yaw),mul(rx(pitch),mul(rz(roll),sc(sx,sy,sz))))));shapes.push({shape,m,c});partCount++;}
+function beam(a,b,w,d,c,shape='box'){
+ let mid=a.map((v,i)=>(v+b[i])/2),v=a.map((q,i)=>b[i]-q),len=Math.hypot(...v)||.001,y=v.map(t=>t/len),ref=[0,0,1];let x=[ref[1]*y[2]-ref[2]*y[1],ref[2]*y[0]-ref[0]*y[2],ref[0]*y[1]-ref[1]*y[0]],lx=Math.hypot(...x);if(lx<.01)x=[1,0,0];else x=x.map(t=>t/lx);let z=[x[1]*y[2]-x[2]*y[1],x[2]*y[0]-x[0]*y[2],x[0]*y[1]-x[1]*y[0]];
+ let m=I();m[0]=x[0]*w;m[1]=x[1]*w;m[2]=x[2]*w;m[4]=y[0]*len;m[5]=y[1]*len;m[6]=y[2]*len;m[8]=z[0]*d;m[9]=z[1]*d;m[10]=z[2]*d;m[12]=mid[0];m[13]=mid[1];m[14]=mid[2];shapes.push({shape,m:mul(stack.at(-1),m),c});partCount++;
+}
+function industrialLeg(side,t=0){let s=side,hip=[s*.92,1.65,.0],knee=[s*1.17,.94,.34],foot=[s*1.16,.23,.53];beam(hip,knee,.37,.43,C.yellow);beam(knee,foot,.30,.32,C.metal);beam([s*1.12,1.47,-.08],[s*1.13,.43,.28],.11,.11,C.piston,'cyl');part('cyl',...knee,.46,.22,.46,C.steelLight,0,0,Math.PI/2);part('box',s*1.16,.13,.68,.81,.26,1.1,C.dark);part('box',s*1.16,.25,.86,.63,.10,.46,C.yellow);part('box',s*1.16,.17,1.23,.73,.15,.23,C.darkYellow);}
+function cannon(x=-1.32,y=1.72,z=.35,scale=1){xyz(x,y,z);push(sc(scale,scale,scale));part('box',0,0,.02,.84,.83,1.10,C.dark);part('box',0,.19,.15,.93,.27,.92,C.steel);part('cyl',0,-.03,.96,.62,1.55,.62,C.steel,0,Math.PI/2);part('cyl',0,-.03,1.76,.67,.14,.67,C.dark,0,Math.PI/2);for(let a=0;a<3;a++){let ang=a*2*Math.PI/3;part('cyl',Math.sin(ang)*.22,-.03+Math.cos(ang)*.22,1.85,.22,.18,.22,C.black,0,Math.PI/2);}part('box',-.43,-.36,.09,.12,.24,1.26,C.steelLight);part('box',.43,-.36,.09,.12,.24,1.26,C.steelLight);pop();pop();}
+function ram(x=1.3,y=1.42,z=.62){xyz(x,y,z);part('box',0,0,-.3,.4,.5,1.2,C.metal);part('box',0,.07,.29,.9,.84,.26,C.steelLight);part('shield',0,.08,.55,1.18,.95,.48,C.yellow);for(let s of [-1,1])part('box',s*.6,.05,.52,.12,1.10,.23,C.dark);part('box',0,-.41,.52,1.18,.12,.20,C.darkYellow);pop();}
+function buildMech(){part('box',0,1.48,-.15,2.04,.53,1.43,C.metal);for(let s of [-1,1])industrialLeg(s);part('wedge',0,2.08,.05,2.12,.9,1.64,C.yellow);part('wedge',0,2.59,.17,1.53,.4,1.00,C.darkYellow);part('box',0,2.28,.88,1.36,.47,.12,C.glass);part('box',0,2.63,.90,1.20,.13,.16,C.steelLight);part('box',0,2.15,1.01,1.58,.12,.12,C.yellow);for(let s of [-1,1]){part('box',s*.94,2.18,.4,.22,.73,.57,C.steel);part('cyl',s*.96,1.93,.10,.54,.29,.54,C.dark,0,0,Math.PI/2);}part('box',0,2.61,-.85,1.28,.65,.38,C.dark);for(let s of [-1,1])part('cyl',s*.52,2.90,-.89,.33,.73,.33,C.steel,0,0,.14*s);part('box',0,3.01,.72,.96,.20,.36,C.steel);for(let s of [-1,1])part('box',s*.28,2.98,.95,.25,.19,.09,C.emission);cannon();ram();}
+function bugLegs(w=.5,zrange=.55,low=.7,scale=1){for(let s of [-1,1])for(let i=0;i<3;i++){let z=(i-1)*zrange,hip=[s*.26*scale,.7*scale,z],knee=[s*(w+.28)*scale,.8*scale,z+(i-1)*.12],toe=[s*(w+.65)*scale,.03,z+(i-1)*.28];beam(hip,knee,.15*scale,.14*scale,C.chitin2,'box');beam(knee,toe,.09*scale,.12*scale,C.black,'box');}}
+function buildStalker(){part('wedge',0,.91,.02,.75,.42,1.75,C.chitin);part('rib',0,1.12,-.24,.83,.27,.8,C.chitin2);part('spear',0,.79,.84,.55,.25,.80,C.bone);bugLegs(.42,.64,.8,1);for(let s of [-1,1]){beam([s*.26,.92,.32],[s*.92,1.44,.92],.17,.15,C.chitin2);beam([s*.92,1.44,.92],[s*.78,.90,1.88],.13,.14,C.bone,'box');part('cone',s*.78,.9,1.92,.14,.45,.14,C.bone,0,Math.PI/2);part('box',s*.21,.98,1.16,.12,.09,.10,C.emission);}}
+function buildSpitter(){part('egg',0,.84,-.24,1.45,1.23,1.65,C.organ);part('rib',0,.52,.48,.92,.41,1.0,C.chitin);part('cyl',0,.95,.61,.48,.70,.48,C.bone,0,Math.PI/2);for(let i=0;i<4;i++)part('box',0,.90,-.65+i*.30,1.12,.12,.10,C.chitin2);bugLegs(.49,.48,.64,.85);for(let s of [-1,1])part('egg',s*.29,1.02,.71,.18,.18,.18,C.emission);}
+function buildGuard(){part('egg',0,.68,-.39,1.45,.66,2.30,C.chitin);part('rib',0,.87,-.43,1.95,.50,1.83,C.chitin2);part('shield',0,.93,1.00,2.50,.76,1.22,C.chitin);part('shield',0,1.07,1.27,2.0,.3,.9,C.steel);for(let s of [-1,1]){part('cone',s*.93,.87,1.38,.25,.94,.25,C.bone,0,Math.PI/2);part('egg',s*.45,.76,1.49,.17,.14,.16,C.emission);}part('egg',0,.66,-1.57,.86,.38,.46,C.blood);bugLegs(.86,.78,.5,1.12);}
+function buildMother(){part('rib',0,1.05,.40,2.4,1.0,2.8,C.chitin);part('shield',0,1.23,1.67,2.55,.63,1.35,C.chitin2);part('egg',0,1.17,-2.16,2.05,1.7,2.60,C.blood);for(let j=0;j<4;j++)part('rib',0,1.27,-1.4-j*.48,2.0-j*.15,.37,.27,j===3?C.bone:C.chitin2);
+for(let s of [-1,1]){for(let i=0;i<3;i++){let z=(i-1)*.85;beam([s*.85,1,z],[s*1.58,1.46,z-.25],.24,.25,C.chitin2);beam([s*1.58,1.46,z-.25],[s*2.1,.08,z+.35],.13,.18,C.black);}beam([s*.65,1.2,1.52],[s*1.6,1.95,2.25],.34,.27,C.chitin2);beam([s*1.6,1.95,2.25],[s*.95,.67,3.42],.18,.20,C.bone);part('egg',s*.54,1.4,2.13,.19,.20,.15,C.emission);}
+for(let j=0;j<3;j++)part('cone',(j-1)*.47,1.65,1.95,.24,.7,.24,C.bone,0,0,Math.PI);}
+function buildMortar(){part('box',0,.5,0,1.5,.33,1.5,C.yellow);for(let s of [-1,1]){part('box',s*.48,.8,.08,.48,.65,1.35,C.steel);part('cyl',s*.48,1.13,.20,.38,1.25,.38,C.dark,0,-.55);part('cyl',s*.48,1.60,.46,.43,.12,.43,C.steelLight,0,-.55);}part('box',0,.65,-.64,1.65,.24,.22,C.metal);}
+function buildWorld(){
+// Diorama scale is reduced 5x compared with game world; only a spatial massing prototype.
+part('box',0,-.05,0,18,.16,18,C.ground);
+// beacon and workshop core
+part('box',0,.5,1,2.4,1.0,2.1,C.rust);part('box',0,1.13,1,2.9,.32,2.5,C.dark);part('box',0,1.65,.9,.35,.90,.35,C.steelLight);part('egg',0,2.15,.9,.32,.33,.32,C.emission);
+part('box',-5,1.1,5,3.6,2.3,3.3,C.steel);part('wedge',-5,2.5,5,4.0,.65,3.9,C.darkYellow);part('box',-5,1.05,3.28,1.85,1.1,.09,C.black);
+// wrecked harvest machine
+part('box',-5,.6,-4,2.4,1.1,1.4,C.yellow);part('box',-3.6,.58,-4,1.45,.25,1.9,C.darkYellow);for(let i=0;i<5;i++)part('cone',-3.0,.5,-4.85+i*.43,.18,.48,.18,C.steel,0,0,-Math.PI/2);
+// silo and pump
+part('cyl',5,1.8,-5,2.0,3.5,2.0,C.steel);part('cone',5,3.8,-5,2.15,1.1,2.15,C.rust);part('box',5,.5,4,2.2,1.1,2.4,C.metal);for(let k=0;k<4;k++)part('cyl',4.2+k*.48,1.2,4.0,.22,.55,.22,C.steel);
+// fence boundaries and field
+for(let i=-8;i<=8;i+=2){part('box',i,.36,-8,.12,.72,.12,C.steel);if(i<8)part('box',i+1,.28,-8,2,.07,.08,C.steel);}for(let i=-8;i<8;i+=.9){part('box',i,.03,-3,.12,.04,8,C.soil);}
+// floodlight
+part('cyl',3.2,1.5,2.3,.16,3,.16,C.steel);part('box',3.2,3,2.3,.85,.3,.44,C.emission);}
+const info={mech:['RECLAIMER-01','Heavy salvage walker: cabin, exposed load-bearing limbs, visible cannon/ram and purposeful engineering.'],stalker:['HOOKRUNNER','Two raised killing hooks. This diagonal, needle-like silhouette advertises its committed lunge.'],spitter:['ACID CARRIER','A dominant living bladder above a low support ring. The sac expands before firing.'],guard:['BULWARK','A low beetle with an oversized frontal shield. The vulnerable rear should be visible during flanking.'],mother:['CATHEDRAL','Brood Mother: armoured forward predator fused to a huge, segmented rear reproductive sac.'],cannon:['BREACH CANNON','Large recoiling machine gun assembly with three recessed bores, heavy breech and guides.'],mortar:['SHOULDER MORTAR','Short angled twin tubes in a repairable shoulder cradle; slow, deliberately telegraphed area support.'],world:['FACILITY 09 — RELAY YARD','Stage-1 miniature: relay beacon, workshop, wrecked harvester, silo, pump, fence and field lanes.']};
+let asset='mech',yaw=.64,pitch=.62,zoom=9,view='3d',sil=false,grid=true,drag=null,cam=[0,6,8],built=-1;
+function remake(){shapes=[];stack=[I()];partCount=0;switch(asset){case 'mech':buildMech();break;case 'stalker':buildStalker();break;case 'spitter':buildSpitter();break;case 'guard':buildGuard();break;case 'mother':buildMother();break;case 'cannon':cannon(0,.25,0,1.4);break;case 'mortar':buildMortar();break;case 'world':buildWorld();break;}}
+const picker=document.getElementById('asset');picker.addEventListener('change',()=>{asset=picker.value;remake();document.getElementById('name').textContent=info[asset][0];document.getElementById('desc').textContent=info[asset][1];zoom=asset==='world'?24:asset==='mother'?13:9;});
+for(let b of document.querySelectorAll('[data-view]'))b.onclick=()=>{document.querySelectorAll('[data-view]').forEach(q=>q.classList.remove('on'));b.classList.add('on');view=b.dataset.view;if(view==='3d'){yaw=.64;pitch=.62;}else if(view==='top'){yaw=0;pitch=1.5;}else{yaw=0;pitch=.04;}};
+document.getElementById('sil').onchange=e=>sil=e.target.checked;document.getElementById('grid').onchange=e=>grid=e.target.checked;
+canvas.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);});canvas.addEventListener('pointermove',e=>{if(!drag)return;let dx=e.clientX-drag[0],dy=e.clientY-drag[1];yaw+=dx*.008;pitch=Math.max(.02,Math.min(1.54,pitch+dy*.006));drag=[e.clientX,e.clientY];});canvas.addEventListener('pointerup',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(4,Math.min(35,zoom*Math.exp(e.deltaY*.001)));},{passive:false});
+function drawOne(s){let gm=gpu[s.shape];gl.uniformMatrix4fv(uM,false,s.m);gl.uniform3fv(uC,rgb(s.c));gl.bindVertexArray(gm.vao);gl.drawArrays(gl.TRIANGLES,0,gm.n);}
+function loop(){let dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.floor(canvas.clientWidth*dpr)),h=Math.max(1,Math.floor(canvas.clientHeight*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clearColor(.05,.08,.09,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.useProgram(p);
+let target=asset==='world'?[0,0.7,0]:[0,asset==='mother'?1:1.25,0],eye=[target[0]+Math.sin(yaw)*Math.cos(pitch)*zoom,target[1]+Math.sin(pitch)*zoom,target[2]+Math.cos(yaw)*Math.cos(pitch)*zoom];let vp=mul(perspective(.7,w/h,.05,140),lookAt(eye,target));gl.uniformMatrix4fv(uVP,false,vp);gl.uniform3fv(uEye,eye);gl.uniform1f(uSil,sil?1:0);
+if(grid&&asset!=='world'&&!sil){for(let i=-6;i<=6;i++){let off=i*1.25;let g1={shape:'box',m:mul(tr(off,-.035,0),sc(.013,.035,17)),c:C.grid},g2={shape:'box',m:mul(tr(0,-.035,off),sc(17,.035,.013)),c:C.grid};drawOne(g1);drawOne(g2);}}
+for(let s of shapes)drawOne(s);gl.bindVertexArray(null);document.getElementById('ninfo').textContent=partCount+' rigid parts · '+(sil?'shape test':'low-poly preview');requestAnimationFrame(loop);}
+remake();loop();
+</script>
+</body>
+</html>
