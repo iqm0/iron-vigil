@@ -79,7 +79,7 @@ The first part of a run is always a rare one. Kinds of part you have found are r
 
 ### The machine changes
 
-The walker starts as a bare frame: a cab on legs with a cannon, an open steel ram frame, no plating.
+The walker starts as a bare frame: a yellow tub on legs with an open roll cage and the mechanic sitting in it, a cannon, an open steel ram frame, no plating.
 
 Every part shows on it: the mortar tube on the shoulder, a brass-wound coil with a lit ball, heat collars on the gun that glow while it fires, coolant pipes, a bone spike under the barrels, horns on the ram, the heart beating on its back, the scythe limbs, the pale second shell until it is shed. A new fitting pops out and settles.
 
@@ -97,13 +97,17 @@ The brood mother is what keeps all of it alive. When she dies, the chitin, the s
 - The ground texture is painted once at start-up, so each frame costs two texture lookups for it.
 - The 3D view is capped at 1.5 million pixels and drops its resolution, never its frame rate, if the device falls behind.
 
+## Sound
+
+Everything is synthesised in the browser; there are no audio files. Effects go out dry and through a short dark reverb. The cannon is a boom, a crack, the action cycling and the case landing. Footsteps are a thud with struck metal and a hiss of hydraulics. Bugs screech before a lunge and chitter when they are near, more of them the closer the crowd. Under it all runs a bed that follows how much danger you are in: wind, a low drone, a dissonant layer that fades up, and a heartbeat that quickens.
+
 ## Accessibility
 
 In **Settings & accessibility** on the title, pause and end screens, saved on the device. Defaults follow `prefers-reduced-motion` and `prefers-contrast`.
 
 - **Motion and flashing:** screen shake, hit-stop, reduce flashing, remains on or off. The gun lights the scene with a steady glow, not a flash per shot.
 - **Vision and text:** darkness brightness, high-contrast mode (paler glowing bugs, bolder lunge lanes, thicker bars), text size up to 200%, numbers for hull and dash, event captions (off by default), and whether the game stops to show a new part.
-- **Audio and haptics:** master, effects and music volume, vibration.
+- **Audio and haptics:** master, effects and ambience volume, vibration.
 - **Controls:** dash button side and size, fixed or floating joystick, dead zone.
 - **Assists:** game speed down to 55%, damage taken, bug speed, number of bugs. Changeable mid-run.
 - **Menus:** semantic dialogs, keyboard operable, focus managed, events and pickups announced to screen readers. The title, settings, pause, part card and end screens pass axe-core (WCAG 2.2 AA and best practice) with no violations.
