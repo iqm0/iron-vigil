@@ -102,6 +102,7 @@ function startPulse() { let next = AC.currentTime + .5;
 
 /* ---------- tuning ---------- */
 let HIP = 1.85, HIPW = 1.4, L1 = 1.2, L2 = 1.25, REACH = 2.38, STRIDE = 4.3, SWING = .42;       // the rig. let, not const, so a blockout can try other proportions
+const RAMREACH = 8.4;       /* the furthest a ram can land: its burst plus the closing step */
 const DASH = { wind: .08, burst: .2, rec: .3, v: 31 };
 const BUGV = 4.5, TELL = .5, LUNGE_T = .3, LUNGE_V = 17, LANE = LUNGE_T * LUNGE_V + .8, PACE = .9, RUN = 180 * PACE;      // the whole game runs at nine tenths speed; RUN is when the brood mother comes, in game seconds: five real minutes in; the night ends when she dies. (Old note: a run lasts six real minutes)
 const YEL = [.78, .47, .05], YEL2 = [.5, .3, .04], DRK = [.055, .06, .07], STL = [.24, .25, .28], RUST = [.24, .1, .045], CONC = [.3, .29, .27], BRASS = [.8, .55, .15];
@@ -171,12 +172,13 @@ function doBlast(b) { const g = G; for (const e of g.en) { if (e.dead) continue;
 
 /* ---------- the shearback: one predator, done properly ----------
    Long, low, four thick legs, two bone blades longer than its body. It circles at seven metres in sprints and dead stops. Then:
-   ANTICIPATION 0.72 s: it stops, drops its rear, and throws both blades out wide. The pose is the warning; the lane on the ground shows only for the last third of a second, when the line is locked.
-   STRIKE 0.2 s: a five-metre pounce, blades scissoring shut.  RECOVERY 0.9 s: blades buried in the ground, body stretched out. This is the opening.
+   ANTICIPATION 0.9 s: it stops, drops its rear, and throws both blades out wide. Its line is fixed from the first frame of that, and the lane on the ground shows for all of it.
+   STRIKE 0.25 s: a five and a half metre leap, blades scissoring shut, the same length at any frame rate.  RECOVERY 0.9 s: blades buried in the ground, body stretched out. This is the opening.
+   It is drawn and collides at 75% of the size it was first built at. The numbers are in SHEAR, and in one table in README.md.
    It takes nine shells. Each one shoves it back half a metre and twists the struck shoulder away, but never stops a wind-up: only the ram does that.
    At a bit over half health it loses a blade, which spins off and sticks in the ground; at a quarter, the other.
-   RAM while it circles: a third of its health, thrown four metres, a tumble. RAM during its wind-up: flipped on its back for 1.8 s, a blade snapped. RAM while it is stuck, down or under half: crushed. */
-const SHEAR = { hp: 410, tell: .9, lock: .9, pounce: .25, pv: 22, stuck: .9, dmg: 14 }, PLUM = [.08, .07, .115], PLUM2 = [.12, .1, .17], PLUMD = [.05, .042, .07], BLADEC = [.68, .62, .48];
+   RAM while it circles: a third of its health, thrown four metres, a tumble. RAM during its wind-up: flipped on its back for 1.8 s, a blade snapped. RAM while it is stuck: crushed, and nothing else is. The ram gives no protection at any point. */
+const SHEAR = { hp: 410, tell: .9, lock: .9, pounce: .25, pv: 22, stuck: .9, dmg: 14, reach: [-.7, 4], half: 1.2, stop: 3.8 }, PLUM = [.08, .07, .115], PLUM2 = [.12, .1, .17], PLUMD = [.05, .042, .07], BLADEC = [.68, .62, .48];
 const CAMDEG = /[?&]camera=46(?:&|$)/.test(location.search) ? 46 : 38;       /* 38 degrees, 30 m back; ?camera=46 for comparison */
 const SS = .9375, SH_HOME = [[.9, .75], [-.9, .75], [.9, -.7125], [-.9, -.7125]], popc = a => (a & 1) + (a >> 1 & 1);
 function spawnShear(x, z, a) { const g = G, e = { shear: true, x, z, a, vx: 0, vz: 0, kx: 0, kz: 0, hp: SHEAR.hp, mhp: SHEAR.hp, s: 1.275, state: 'emerge', st: 1.5, cd: rand(1.4, 2.2), arms: 3, flinch: 0, fa: 0, pose: 0, strike: 0, flip: 0, bias: Math.random() < .5 ? -1 : 1, sprint: .8, pause: .4, ldx: 0, ldz: 1, la: 0, hitP: false, flash: 0, phase: Math.random(), legs: null, dead: false, stag: 0, emer: 0, big: false, locked: false }; g.en.push(e); return e; }
@@ -194,16 +196,27 @@ function hurtShear(e, dmg, dx, dz, ram, heavy) { const g = G; let crushed = fals
   e.dead = true; g.kills++; if (crushed) g.crushed++; sfx.kill(); g.corpses.push({ x: e.x, z: e.z, a: e.a, vx: dx * (ram ? 5 : 9), vz: dz * (ram ? 5 : 9), t: 0, flat: crushed, arms: e.arms, roll: Math.random() < .5 ? -1 : 1 });
   if (crushed) { sfx.boom(); for (let i = 0; i < 7; i++) debris(i % 2 ? MESH.oct : MESH.shell, e.x + rand(-.6, .6), rand(.4, 1), e.z + rand(-.6, .6), rand(.25, .5), rand(.1, .2), rand(.3, .6), i % 3 ? PLUM : PLUMD, -.7, dx * rand(2, 9) + rand(-6, 6), rand(4, 9), dz * rand(2, 9) + rand(-6, 6), rand(1.6, 2.6)); }
   if (ST.gore) mark(e.x + dx * .8, e.z + dz * .8, crushed ? 2.2 : 1.3, crushed ? 2.2 : 1.9, Math.atan2(dx, dz), 3, .13, .1, .12, .5, 7, rand(0, 9)); g.enc.last = e; }
+/* how far along the line from (x0, y0) to (x1, y1), from 0 to 1, it first touches the box xa..xb by -h..h; -1 if it never does */
+function sweepBox(x0, y0, x1, y1, xa, xb, h) { let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0 - xa, xb - x0, y0 + h, h - y0];
+  for (let i = 0; i < 4; i++) { if (P[i] === 0) { if (Q[i] <= 0) return -1; continue; } const r = Q[i] / P[i]; if (P[i] < 0) { if (r > t1) return -1; if (r > t0) t0 = r; } else { if (r < t0) return -1; if (r < t1) t1 = r; } } return t0 < t1 || (dx === 0 && dy === 0) ? t0 : -1; }
 function updShear(e, dt) { const g = G, dx = g.x - e.x, dz = g.z - e.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d, lame = popc(e.arms) === 0 ? .6 : 1; let mvx = 0, mvz = 0, face = Math.atan2(ux, uz), turn = 7; e.flash -= dt; e.flinch = Math.max(0, e.flinch - dt);       /* e.st and e.cd are counted down by updBug before it hands over */
   if (e.state === 'emerge') { mvx = ux * 3.4; mvz = uz * 3.4; if (e.st <= 0) e.state = 'stalk'; }
   else if (e.state === 'stalk') { e.sprint -= dt; if (e.sprint < -e.pause) { e.sprint = rand(.7, 1.2); e.pause = rand(.3, .55); if (Math.random() < .3) e.bias = -e.bias; }
     if (e.sprint > 0) { const v = 5.6 * lame * ST.espd, rad = d > 7 ? 1 : d < 5 ? -.8 : 0, tan = rad ? .5 : 1; mvx = (ux * rad - uz * e.bias * tan) * v; mvz = (uz * rad + ux * e.bias * tan) * v; }
     let busy = 0; for (const o of g.en) if (o.shear && (o.state === 'tell' || o.state === 'pounce')) busy++;
-    if (d < 7.8 && e.cd <= 0 && busy < g.enc.cap && !g.dead && !g.won && !g.demo) { e.state = 'tell'; e.st = SHEAR.tell; e.locked = false; sfx.tell(); if (e.z > g.z + 3) cap('Attack from behind.', 1.6); } }
-  else if (e.state === 'tell') { turn = 9; if (!e.locked && e.st <= SHEAR.lock) { e.locked = true; const px = g.x + g.vx * .1 - e.x, pz = g.z + g.vz * .1 - e.z, l = Math.hypot(px, pz) || 1; e.ldx = px / l; e.ldz = pz / l; e.la = Math.atan2(e.ldx, e.ldz); } if (e.locked) face = e.la;
-    if (e.st <= 0) { e.state = 'pounce'; e.st = SHEAR.pounce; e.hitP = false; sfx.lunge(); } }
-  else if (e.state === 'pounce') { face = e.la; turn = 30; mvx = e.ldx * SHEAR.pv; mvz = e.ldz * SHEAR.pv; e.vx = mvx; e.vz = mvz; const al = dx * e.ldx + dz * e.ldz, lat = Math.abs(dx * e.ldz - dz * e.ldx); if (!e.hitP && al > -.7 && al < 4.0 && lat < 1.2) { e.hitP = true; hurtPlayer(popc(e.arms) ? SHEAR.dmg : 10, e.ldx, e.ldz); } if (al < 3.8 && al > 0 && lat < 1.7) {       /* it hits what is on its line, and only that: one step to the side is enough */ e.vx = e.vz = mvx = mvz = 0; e.st = Math.min(e.st, .03); }
-    if (e.st <= 0) { e.state = 'stuck'; e.st = popc(e.arms) ? SHEAR.stuck : .5; e.vx = e.vz = 0; dust(e.x + e.ldx * 2, e.z + e.ldz * 2, 6, 3, .4); if (popc(e.arms)) { sparks(e.x + e.ldx * 2.6, .1, e.z + e.ldz * 2.6, -e.ldx, -e.ldz, 6, 1, .85, .6, 8); mark(e.x + e.ldx * 2.4, e.z + e.ldz * 2.4, .12, 1.0, e.la, 2, 0, 0, 0, .5, 8); } } }
+    if (d < 7.8 && e.cd <= 0 && busy < g.enc.cap && !g.dead && !g.won && !g.demo) { e.state = 'tell'; e.st = SHEAR.tell; e.locked = false; sfx.tell(); if (unseen(e.x, e.z)) cap(e.z > g.z + 2 ? 'Attack from behind.' : e.x > g.x ? 'Attack from the right.' : 'Attack from the left.', 1.6); } }
+  else if (e.state === 'tell') { turn = 9; if (!e.locked && e.st <= SHEAR.lock) { e.locked = true; const px = g.x + g.vx * .1 - e.x, pz = g.z + g.vz * .1 - e.z, l = Math.hypot(px, pz) || 1; e.ldx = px / l; e.ldz = pz / l; e.la = Math.atan2(e.ldx, e.ldz); } if (e.locked) { face = e.la; e.pal = dx * e.ldx + dz * e.ldz; e.psl = dx * e.ldz - dz * e.ldx; }       /* where the walker stands in the lane, kept every step so the leap's first step has a true starting point */
+    if (e.st <= 0) { e.state = 'pounce'; e.st = SHEAR.pounce; e.hitP = false; e.halt = false; sfx.lunge(); } }
+  else if (e.state === 'pounce') { face = e.la; turn = 30;
+    /* The leap is moved here and nowhere else: its speed for exactly its time, the last step cut to what is left of it, so it covers the same ground at any frame rate. */
+    const mt = e.halt ? 0 : e.st <= 0 ? Math.max(0, dt + e.st) : dt, go = SHEAR.pv * mt; if (e.pal === undefined) { e.pal = dx * e.ldx + dz * e.ldz; e.psl = dx * e.ldz - dz * e.ldx; } e.x += e.ldx * go; e.z += e.ldz * go; e.vx = e.vz = 0;
+    const rx = g.x - e.x, rz = g.z - e.z, al = rx * e.ldx + rz * e.ldz, sl = rx * e.ldz - rz * e.ldx;
+    /* Where the walker was in the animal's lane last step, and where it is now, make a line. Two boxes lie on that lane: the one the blades cut, and a wider, shorter one that stops the animal.
+       Whichever the line reaches first decides it: into the blades first is a hit, once; into the body's way first stops the leap without one. Decided along the line, not per frame. */
+    const th = e.hitP ? -1 : sweepBox(e.pal, e.psl, al, sl, SHEAR.reach[0], SHEAR.reach[1], SHEAR.half), tb = e.halt ? -1 : sweepBox(e.pal, e.psl, al, sl, 0, SHEAR.stop, 1.7), block = tb >= 0;
+    if (th >= 0 && (tb < 0 || th <= tb)) { e.hitP = true; hurtPlayer(popc(e.arms) ? SHEAR.dmg : 10, e.ldx, e.ldz); } e.pal = al; e.psl = sl;
+    if (block) { const back = Math.max(0, Math.min(SHEAR.stop - al, go)); e.x -= e.ldx * back; e.z -= e.ldz * back; e.pal = al + back; e.halt = true; e.st = 0; }       /* it stops short of what is on its line, at the same distance every time, and its blades are in the ground that instant: a pause here was one frame long, and so longer on a slow phone */
+    if (e.st <= 0) { e.state = 'stuck'; e.halt = false; e.st = popc(e.arms) ? SHEAR.stuck : .5; e.vx = e.vz = 0; dust(e.x + e.ldx * 2, e.z + e.ldz * 2, 6, 3, .4); if (popc(e.arms)) { sparks(e.x + e.ldx * 2.6, .1, e.z + e.ldz * 2.6, -e.ldx, -e.ldz, 6, 1, .85, .6, 8); mark(e.x + e.ldx * 2.4, e.z + e.ldz * 2.4, .12, 1.0, e.la, 2, 0, 0, 0, .5, 8); } } }
   else { face = e.a; if (e.st <= 0) { e.cd = Math.max(e.cd, rand(2.4, 3.4)); e.state = 'stalk'; e.sprint = .9; } }       /* stuck, tumbling, or on its back */
   e.stag = e.state === 'stuck' || e.state === 'down' ? Math.max(.01, e.st) : 0;
   const k = 1 - Math.exp(-dt * 9); e.vx += (mvx - e.vx) * k; e.vz += (mvz - e.vz) * k; const kd = Math.exp(-dt * 7); e.kx *= kd; e.kz *= kd; e.x += (e.vx + e.kx) * dt; e.z += (e.vz + e.kz) * dt; pushOut(e, .85); e.a += clamp(angDiff(e.a, face), -turn * dt, turn * dt);
@@ -430,13 +443,10 @@ function die() { const g = G; g.hp = 0; g.dead = .001; g.dash = null; g.boom = 1
   for (let i = 0; i < 16; i++) debris(MESH.cube, g.x + rand(-.5, .5), rand(1.6, 2.8), g.z + rand(-.5, .5), rand(.2, .8), rand(.15, .5), rand(.2, .8), Math.random() < .6 ? YEL : DRK, 0, rand(-9, 9), rand(5, 14), rand(-9, 9), rand(3, 5));
   for (let i = 0; i < 40; i++) { const a = rand(0, TAU), s = rand(2, 13); part(0, g.x, rand(1.5, 2.6), g.z, Math.sin(a) * s, rand(1, 9), Math.cos(a) * s, rand(.4, 1), rand(.6, 1.6), 1, rand(.4, .7), .12, 1, 6, 2, -.6); } dust(g.x, g.z, 16, 7, .8); }
 function startDash(dx, dz) { const g = G; if (!g || g.dash || g.dcd > 0 || g.dead || g.demo || state !== 'play') return; const l = Math.hypot(dx, dz); if (l < .01) { dx = Math.sin(g.head); dz = Math.cos(g.head); } else { dx /= l; dz /= l; }
-  // Add the 2m closing step only when the target is pinned, close enough, and in front.
-  // A poorly aimed flick or mistimed ram gets no automatic reach correction.
-  const target = g.tgt && g.tgt.shear && g.tgt.state === 'stuck' && !g.tgt.dead ? g.tgt : null;
-  const tx = target ? target.x - g.x : 0, tz = target ? target.z - g.z : 0;
-  const ahead = target && (tx * dx + tz * dz) / (Math.hypot(tx, tz) || 1) > .87;
-  const close = ahead && Math.hypot(tx, tz) >= 5 && Math.hypot(tx, tz) <= 8.4;
-  const B = DASH.burst * (g.s.chain ? 1.5 : 1) + (close ? 2 / DASH.v : 0); g.dash = { t: 0, dx, dz, hit: new Set(), skidded: false, B, back: false }; g.dcd = g.s.dashCd; g.crouch.v += 5.5; g.fov.v += 1.2; g.trauma = Math.min(1, g.trauma + (.22) * FB); sfx.dash();
+  /* The 2 m closing step: only onto a pinned animal that the ram is aimed at and that is 5 to 8.4 m away. It is chosen by where the ram points, not by what the cannon happens to track,
+     and a ram aimed anywhere else gets nothing. If that animal pulls free before the walker reaches it, the extra reach is taken back. */
+  let pin = null, pd = RAMREACH; for (const e of g.en) { if (e.dead || !e.shear || e.state !== 'stuck') continue; const tx = e.x - g.x, tz = e.z - g.z, d = Math.hypot(tx, tz); if (d >= 5 && d <= pd && (tx * dx + tz * dz) / d > .87) { pd = d; pin = e; } }
+  const base = DASH.burst * (g.s.chain ? 1.5 : 1), B = base + (pin ? 2 / DASH.v : 0); g.dash = { t: 0, dx, dz, hit: new Set(), skidded: false, B, base, pin, back: false }; g.dcd = g.s.dashCd; g.crouch.v += 5.5; g.fov.v += 1.2; g.trauma = Math.min(1, g.trauma + (.22) * FB); sfx.dash();
   dust(g.x, g.z, 14, 6, .55); mark(g.x, g.z, 1.7, 1.7, 0, 0, 0, 0, 0, .55, 9); }
 function stomp(f, side) { const g = G; g.bob.v -= 3.4; g.roll.v += side * 1.8; g.trauma = Math.min(1, g.trauma + (.035) * FB); dust(f.x, f.z, 3, 1.8, .3); if (!g.demo) sfx.step();
   mark(f.x + Math.sin(f.a) * .1, f.z + Math.cos(f.a) * .1, .24, .44, f.a, 2, 0, 0, 0, .3, 10); { const c = Math.cos(g.aim), sn = Math.sin(g.aim), q = side * .4; part(1, g.x + q * c - .84 * sn, g.py + 2.1, g.z - q * sn - .84 * c, rand(-.3, .3), rand(2, 3), rand(-.3, .3), .8, .2, .2, .2, .21, .35, 0, 1.2, .7); }      // a print on the pad and a chuff from the stack
@@ -464,7 +474,7 @@ function update(dt) { const g = G; g.t += dt;
   let ix = 0, iz = 0; if (!g.demo && !g.dead) { if (stick) { ix = stick.dx; iz = stick.dy; } if (keys.w || keys.arrowup) iz -= 1; if (keys.s || keys.arrowdown) iz += 1; if (keys.a || keys.arrowleft) ix -= 1; if (keys.d || keys.arrowright) ix += 1; const l = Math.hypot(ix, iz); if (l > 1) { ix /= l; iz /= l; } }
   g.ix = ix; g.iz = iz;
   // dash: a short windup, a thruster burst, then a skid
-  let burst = false; if (g.dash) { const d = g.dash; d.t += dt; if (d.t < DASH.wind + d.B) { burst = d.t >= DASH.wind; const v = (burst ? DASH.v : DASH.v * .12) * (d.slow || 1); g.vx = d.dx * v; g.vz = d.dz * v; } else { if (!d.skidded) { d.skidded = true; d.miss = d.hit.size === 0; if (!d.miss) g.dcd -= .8; sfx.skid(); dust(g.x, g.z, 8, 4, .5);       /* a ram that connects comes back sooner; one that hits nothing leaves the walker sliding with the cannon down */ if (g.s.chain > 1) { blast(g.x, g.z, 4.6, g.s.pow * 6); DL.push({ x: g.x, z: g.z, sx: 1, sz: 1, rot: 0, kind: 1, r: 1, g: .6, b: .2, a: .9, t: 0, life: .3, seed: 0, grow: 14 }); g.crouch.v += 6; g.trauma = Math.min(1, g.trauma + (.35) * FB); } } if (d.t > DASH.wind + d.B + (d.miss ? .6 : .2)) g.dash = null; } }
+  let burst = false; if (g.dash) { const d = g.dash; d.t += dt; if (d.pin && !d.hit.has(d.pin) && (d.pin.dead || d.pin.state !== 'stuck')) { d.B = d.base; d.pin = null; } if (d.t < DASH.wind + d.B) { burst = d.t >= DASH.wind; const v = (burst ? DASH.v : DASH.v * .12) * (d.slow || 1); g.vx = d.dx * v; g.vz = d.dz * v; } else { if (!d.skidded) { d.skidded = true; d.miss = d.hit.size === 0; if (!d.miss) g.dcd -= .8; sfx.skid(); dust(g.x, g.z, 8, 4, .5);       /* a ram that connects comes back sooner; one that hits nothing leaves the walker sliding with the cannon down */ if (g.s.chain > 1) { blast(g.x, g.z, 4.6, g.s.pow * 6); DL.push({ x: g.x, z: g.z, sx: 1, sz: 1, rot: 0, kind: 1, r: 1, g: .6, b: .2, a: .9, t: 0, life: .3, seed: 0, grow: 14 }); g.crouch.v += 6; g.trauma = Math.min(1, g.trauma + (.35) * FB); } } if (d.t > DASH.wind + d.B + (d.miss ? .6 : .2)) g.dash = null; } }
   if (!g.dash || g.dash.skidded) { const k = 1 - Math.exp(-dt * (g.dash ? (g.dash.miss ? 2.2 : 8) : g.s.accel)), v = g.s.speed; g.vx += (ix * v - g.vx) * k; g.vz += (iz * v - g.vz) * k; }
   if (g.dead) { g.vx *= Math.exp(-dt * 6); g.vz *= Math.exp(-dt * 6); }
   const ax = (g.vx - g.pvx) / dt, az = (g.vz - g.pvz) / dt; g.pvx = g.vx; g.pvz = g.vz; g.x += g.vx * dt; g.z += g.vz * dt; pushOut(g, 1.3); const sp = Math.hypot(g.vx, g.vz);
@@ -782,9 +792,9 @@ function hud() { const g = G; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearR
   if (g.hurtT > 0 || g.hp < 30) { const a = Math.max(g.hurtT * (ST.flash ? .22 : .4), g.hp < 30 && !g.dead ? .18 + (ST.flash ? 0 : Math.sin(g.t * 6) * .06) : 0), gr = ctx.createRadialGradient(W / 2, H / 2, H * .43, W / 2, H / 2, H * .72);       /* red at the edges of the screen only: it must not tint the fight */ gr.addColorStop(0, 'rgba(200,20,10,0)'); gr.addColorStop(1, `rgba(200,20,10,${a})`); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
   // a swarm is coming: the dark at that edge of the screen turns red for a few seconds
   for (const c of g.cues) { const ux = Math.sin(c.a), uy = Math.cos(c.a), t = Math.min(ux ? (W / 2) / Math.abs(ux) : 1e9, uy ? (H / 2) / Math.abs(uy) : 1e9), ex = W / 2 + ux * t, ey = H / 2 + uy * t, k = Math.min(1, c.t) * Math.min(1, (3.4 - c.t) * 3) * (ST.flash ? .8 : .75 + Math.sin(performance.now() / 160) * .25), gr = ctx.createRadialGradient(ex, ey, 0, ex, ey, W * .42); gr.addColorStop(0, `rgba(255,40,20,${(hc ? .6 : .38) * k})`); gr.addColorStop(1, 'rgba(255,40,20,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
-  /* A wind-up from behind the walker is under the thumbs, so it is repeated above them. Behind means toward the bottom of the screen, not behind the walker's heading.
-     The controls cover the ground from about 4 m back; an animal centred 3 m back already has most of its body under them. */
-  for (const e of g.en) if (e.shear && e.state === 'tell' && e.locked && e.z > g.z + 3) { const w = toScr(g.x, 0, g.z), q = toScr(e.x, 0, e.z); if (!w) continue; const a = q ? Math.atan2(q[1] - w[1], q[0] - w[0]) : Math.PI / 2, k = ST.flash ? .85 : .7 + Math.sin(performance.now() / 110) * .3;
+  /* A wind-up the player cannot see, because it is off the screen or under a thumb, is repeated as an arc round the walker on the side it comes from. Worked out from where the animal
+     falls on the screen and where the controls are for this hand, at whichever camera angle is in use. */
+  for (const e of g.en) if (e.shear && e.state === 'tell' && e.locked && unseen(e.x, e.z)) { const w = toScr(g.x, 0, g.z); if (!w) continue; const a = Math.atan2(e.z - g.z, e.x - g.x), k = ST.flash ? .85 : .7 + Math.sin(performance.now() / 110) * .3;
     ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,40,20,${(hc ? .95 : .8) * k})`; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(w[0], w[1], 72, a - .5, a + .5); ctx.stroke(); ctx.strokeStyle = `rgba(255,40,20,${.28 * k})`; ctx.lineWidth = 16; ctx.beginPath(); ctx.arc(w[0], w[1], 72, a - .5, a + .5); ctx.stroke(); ctx.restore(); }       /* a red arc round the walker on the side the attack comes from: no words, and above the thumbs */
   for (const d of g.drops) { if (d.k === 'fix') continue; const sc = toScr(d.x, .8, d.z); if (sc && sc[0] > 10 && sc[0] < W - 10 && sc[1] > SAFE + 44 && sc[1] < H - 10) continue;       // salvage or an organ lying off screen: a diamond at the edge with an arrow toward it
     const col = d.k === 'organ' ? '#b6e04a' : '#f2b01e', dx = d.x - g.x, dy = d.z - g.z, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, m = 26, t = Math.min(ux > 0 ? (W - m - W / 2) / ux : ux < 0 ? (m - W / 2) / ux : 1e9, uy > 0 ? (H - m - H / 2) / uy : uy < 0 ? (SAFE + 70 - H / 2) / uy : 1e9), bob = ST.flash ? 0 : Math.sin(performance.now() / 200) * 3;
@@ -877,24 +887,24 @@ $('preVis').onclick = () => preset({ contrast: true, bright: .4, text: 1.25, num
 $('preReset').onclick = () => { ST = defaultSettings(); settingsChanged(); buildSettings(); announce('Settings reset to device defaults'); };
 
 /* ---------- input: one thumb to walk, a button to dash (tap it, or drag it to aim) ---------- */
-function dashAuto() { const g = G;
-  // A tap attacks the tracked threat, regardless of where the movement thumb rests.
-  // Only a directional flick on the ram button overrides this aim.
-  if (g.tgt && !g.tgt.dead) {
-    const dx = g.tgt.x - g.x, dz = g.tgt.z - g.z;
-    if (Math.hypot(dx, dz) > .2) { startDash(dx, dz); return; }
-  }
-  startDash(Math.sin(g.gunA), Math.cos(g.gunA));
-}
+/* What a tap on the ram goes at. A pinned animal within reach comes first, then whatever the cannon is tracking, and neither unless it is on the screen: a tap never sends the walker at something the player cannot see.
+   Failing both it goes the way the walker is heading. A flick on the button overrides all of this. */
+/* Can the player not see this spot: off the screen, under the bar at the top, or under a thumb (the control, and the thumb coming up to it from below) */
+function unseen(x, z) { const s = toScr(x, 1, z); if (!s || s[0] < 0 || s[0] > W || s[1] < 56 || s[1] > H) return true; const B = dashBtn(), b = stick ? { x: stick.ox, y: stick.oy } : stickBase();
+  for (const c of [[B.x, B.y, B.r * 1.3], [b.x, b.y, 74]]) { if (Math.hypot(s[0] - c[0], s[1] - c[1]) < c[2]) return true; if (s[1] > c[1] && Math.abs(s[0] - c[0]) < c[2] * .8) return true; } return false; }
+function onScreen(x, z) { const s = toScr(x, 1, z); return !!s && s[0] > 0 && s[0] < W && s[1] > 0 && s[1] < H; }
+function ramTarget() { const g = G; let best = null, bd = RAMREACH; for (const e of g.en) { if (e.dead || !e.shear || e.state !== 'stuck') continue; const d = Math.hypot(e.x - g.x, e.z - g.z); if (d < bd && onScreen(e.x, e.z)) { bd = d; best = e; } }
+  if (best) return best; const t = g.tgt; return t && !t.dead && onScreen(t.x, t.z) ? t : null; }
+function dashAuto() { const g = G, t = ramTarget(); if (t && Math.hypot(t.x - g.x, t.z - g.z) > .2) startDash(t.x - g.x, t.z - g.z); else startDash(Math.sin(g.head), Math.cos(g.head)); }
 function keyDash() { let ix = 0, iz = 0; if (keys.w || keys.arrowup) iz -= 1; if (keys.s || keys.arrowdown) iz += 1; if (keys.a || keys.arrowleft) ix -= 1; if (keys.d || keys.arrowright) ix += 1; if (ix || iz) startDash(ix, iz); else dashAuto(); }
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); keys[k] = true; if (state === 'play' && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
   if ((k === 'shift' || k === ' ') && state === 'play' && !e.repeat) keyDash();
   if ((k === 'p' || k === 'escape') && $('settings').classList.contains('on')) { closeSettings(); e.preventDefault(); } else if (k === 'p' || k === 'escape') togglePause();
   if (k === 'm') { muted = !muted; applyAudio(); announce(muted ? 'Sound off' : 'Sound on'); } });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') togglePause(); });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; stick = null; dbtn = null; if (state === 'play') togglePause(); });
 addEventListener('keydown', e => { if (state !== 'choose') return; if (e.key === '1') choose(0); else if (e.key === '2') choose(1); else if (e.key === '3' && offer && offer.kind === 'organ') choose(-1); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) return; stick = null; dbtn = null; if (state === 'play') togglePause(); });
 cv.addEventListener('pointerdown', e => { if (state !== 'play') return; const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, B = dashBtn(), P = pauseBtn(); try { cv.setPointerCapture(e.pointerId); } catch (er) { }
   if (Math.hypot(x - P.x, y - P.y) < P.r + 10) { togglePause(); return; }
   if (!dbtn && Math.hypot(x - B.x, y - B.y) < B.r * 1.25) { dbtn = { id: e.pointerId, ux: 0, uy: 0, d: 0, used: false }; return; }
@@ -914,10 +924,15 @@ cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', c
 
 /* ---------- loop ---------- */
 let emaDt = 16.7, lastQ = 0, fpsN = 0, fpsT = 0; const fpsEl = $('fps'), showFps = /[?&]fps/.test(location.search); if (showFps) fpsEl.style.display = 'block';
+/* Render resolution. Down a notch when frames have run long (over 21 ms on average) for 2.5 s. Up a notch when they have held the screen's rate (under 17.6 ms) for 8 s.
+   If a step up is followed by a step down within 12 s, that level is too much for this phone and is not tried again, so it cannot bounce. */
+const QS = { q: 1, last: 0, up: -1e9, cap: 1 };
+function qPolicy(s, now, ema) { if (now - s.last > 2500 && ema > 21 && s.q > .5) { if (now - s.up < 12000) s.cap = Math.max(.5, s.q - .17); s.q = Math.max(.5, s.q - .17); s.last = now; }
+  else if (now - s.last > 8000 && ema < 17.6 && s.q + .17 <= s.cap + 1e-6) { s.q = Math.min(1, s.q + .17); s.last = s.up = now; } return s.q; }
 function step(dt) { const g = G; if (state !== 'play' && state !== 'title') return; let ts = PACE * (state === 'play' ? ST.tscale : 1); if (g.freeze > 0) { g.freeze -= dt; ts *= .06; } update(Math.max(1e-4, dt * ts)); camUpdate(dt); }
 function frame(now) {
   requestAnimationFrame(frame); const raw = now - lastT, dt = clamp((raw || 0) / 1000, 0, .05); lastT = now;
-  if (raw < 100 && raw > 0) { emaDt = emaDt * .96 + raw * .04; if (now - lastQ > 2500 && emaDt > 21 && Q > .5) { Q = Math.max(.5, Q - .17); lastQ = now; emaDt = 16.7; resize(); } }     // drop resolution rather than frames
+  if (raw < 100 && raw > 0) { emaDt = emaDt * .96 + raw * .04; const q = qPolicy(QS, now, emaDt); if (q !== Q) { Q = q; emaDt = 16.7; resize(); } }     // drop resolution rather than frames, and give it back when there is room
   if (showFps) { fpsN++; if (now - fpsT > 500) { fpsEl.textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps  q' + Q.toFixed(2) + '  bugs ' + G.en.length + '  ' + glc.width + 'x' + glc.height + '  inst ' + STATS.inst + ' in ' + STATS.batches + '  spr ' + STATS.sprites + '  dec ' + STATS.decals; fpsN = 0; fpsT = now; } }
   step(dt); render();
 }
@@ -927,4 +942,7 @@ window.render_game_to_text = () => { const g = G; return JSON.stringify({ state,
 
 applySettings(); resize(); newGame(true); titleInfo(); cv.style.visibility = 'hidden';
 try { GLOK = initGL(glc); } catch (e) { GLOK = false; console.error(e); }
+/* A phone can take the graphics context away (another app, memory). Stop drawing and pause; when it comes back rebuild everything, and if that fails reload the page. Never a blank frame left running. */
+glc.addEventListener('webglcontextlost', e => { e.preventDefault(); GLOK = false; stick = null; dbtn = null; if (state === 'play') togglePause(); });
+glc.addEventListener('webglcontextrestored', () => { try { GLOK = initGL(glc); resize(); } catch (e) { GLOK = false; } if (!GLOK) location.reload(); });
 if (!GLOK) { show('nogl'); } else requestAnimationFrame(t => { lastT = t; frame(t); });

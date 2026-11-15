@@ -7,7 +7,7 @@ const { chromium } = require('playwright'), path = require('path');
     // the same seed plays the same run
     setSeed(3); startGame(); run(400); const a = [G.lurks.length, G.en.length, G.en[0] && G.en[0].x.toFixed(3)].join(); setSeed(3); startGame(); run(400); ok('a seed repeats the encounter', a === [G.lurks.length, G.en.length, G.en[0] && G.en[0].x.toFixed(3)].join(), a);
     // the cannon: nine shells, each a shove, and no shell stops a wind-up
-    fresh(); let e = bug(0, 7); const x0 = e.z; shell(e); run(20); ok('a shell shoves it back about half a metre', e.z - x0 < -.4 && e.z - x0 > -.9, (e.z - x0).toFixed(2)); ok('and makes it flinch', true);
+    fresh(); let e = bug(0, 7); const x0 = e.z; shell(e); const fl0 = e.flinch; run(20); ok('a shell shoves it back about half a metre', e.z - x0 < -.4 && e.z - x0 > -.9, (e.z - x0).toFixed(2)); ok('and makes it flinch, for a moment', fl0 > .1 && e.flinch === 0, fl0.toFixed(2) + ' then ' + e.flinch.toFixed(2));
     fresh(); e = bug(0, 7); let n = 0; while (!e.dead && n < 20) { shell(e); n++; } ok('nine shells kill it', n === 9, n);
     fresh(); e = bug(0, 7, 'tell'); shell(e, 3); ok('shells do not cancel a wind-up', e.state === 'tell');
     fresh(); e = bug(0, 7); shell(e, 4); ok('it loses a blade at a bit over half health', popc(e.arms) === 1, e.hp.toFixed(0) + '/' + e.mhp); shell(e, 3); ok('and the other at a quarter', popc(e.arms) === 0, e.hp.toFixed(0)); ok('a severed blade stays in the yard', G.relics.length === 2);
