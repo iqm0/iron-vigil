@@ -79,7 +79,7 @@ vec3 lightAll(vec3 P, vec3 N, vec3 alb, float sp) {
   vec3 L = uSpotP - P; float d = length(L); L /= d; float cone = smoothstep(uSpotK.x, uSpotK.y, dot(-L, uSpotD));
   if (cone > 0.) { float at = cone / (1. + d * d * .012) * smoothstep(46., 26., d); vec4 q = uSpotVP * vec4(P + N * .07, 1.); vec3 s = q.xyz / q.w * .5 + .5; float ts = 1. / 1024., sh = 0.;
     sh += texture(uSh, vec3(s.xy + vec2(-ts, -ts), s.z - .0012)); sh += texture(uSh, vec3(s.xy + vec2(ts, -ts), s.z - .0012)); sh += texture(uSh, vec3(s.xy + vec2(-ts, ts), s.z - .0012)); sh += texture(uSh, vec3(s.xy + vec2(ts, ts), s.z - .0012)); sh *= .25;
-    float nl = max(dot(N, L), 0.); vec3 H = normalize(L + V); c += uSpotC * at * sh * (alb * nl + sp * pow(max(dot(N, H), 0.), 36.) * nl); }
+    float nl = max(dot(N, L), 0.); vec3 H = normalize(L + V); c += uSpotC * at * (.2 + .8 * sh) * (alb * nl + sp * pow(max(dot(N, H), 0.), 36.) * nl); }
   for (int i = 0; i < 6; i++) { vec3 Lp = uPL[i].xyz - P; float dp = length(Lp); float at = max(1. - dp / uPL[i].w, 0.); at *= at; if (at > 0.) { Lp /= dp; float nl = max(dot(N, Lp), 0.) * .85 + .15; vec3 H = normalize(Lp + V); c += uPC[i] * at * (alb * nl + sp * pow(max(dot(N, H), 0.), 24.) * .6); } }
   float rim = pow(1. - max(dot(N, V), 0.), 3.) * clamp(N.y * .7 + .45, 0., 1.); c += uRim * rim * (.35 + sp);
   return c; }
@@ -204,6 +204,7 @@ function ik2(H, F, l1, l2, pole, o) { let dx = F[0] - H[0], dy = F[1] - H[1], dz
   o[0] = H[0] + dx * a + bx * h; o[1] = H[1] + dy * a + by * h; o[2] = H[2] + dz * a + bz * h; return o; }
 function sprite(buf, x, y, z, w, h, ax, ay, az, r, g, b, a) { if (buf.n >= buf.max) return; const d = buf.data, o = buf.n * 12; d[o] = x; d[o + 1] = y; d[o + 2] = z; d[o + 3] = w; d[o + 4] = h; d[o + 5] = ax; d[o + 6] = ay; d[o + 7] = az; d[o + 8] = r; d[o + 9] = g; d[o + 10] = b; d[o + 11] = a; buf.n++; }
 const glow = (x, y, z, s, r, g, b, a) => sprite(PADD, x, y, z, s, s, 0, 0, 0, r, g, b, a);
+function shadowCut() { for (const k in MESH) MESH[k].ns = MESH[k].n; }       /* nothing drawn after this casts a shadow from the lamp */
 function decal(x, z, sx, sz, rot, kind, r, g, b, a, lift, seed) { if (DEC.n >= DEC.max) return; const d = DEC.data, o = DEC.n * 12; d[o] = x; d[o + 1] = z; d[o + 2] = sx; d[o + 3] = sz; d[o + 4] = rot; d[o + 5] = kind; d[o + 6] = lift || 0; d[o + 7] = seed || 0; d[o + 8] = r; d[o + 9] = g; d[o + 10] = b; d[o + 11] = a; DEC.n++; }
 
 /* ---------- frame ---------- */
@@ -220,7 +221,7 @@ function renderScene(S, W, H) {
   for (const m of meshes) { gl.bindBuffer(gl.ARRAY_BUFFER, m.ib); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.inst, 0, m.n * 20); }
   // shadow pass: what the headlamp sees
   gl.bindFramebuffer(gl.FRAMEBUFFER, shadowFB); gl.viewport(0, 0, SH, SH); gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND); gl.clear(gl.DEPTH_BUFFER_BIT); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2, 4); gl.disable(gl.CULL_FACE);
-  gl.useProgram(PROG.depth); gl.uniformMatrix4fv(PROG.depth.u.uVP, false, SVP); for (const m of meshes) if (m.n) { gl.bindVertexArray(m.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, m.count, m.n); }
+  gl.useProgram(PROG.depth); gl.uniformMatrix4fv(PROG.depth.u.uVP, false, SVP); for (const m of meshes) { const k = m.ns >= 0 ? m.ns : m.n; if (k) { gl.bindVertexArray(m.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, m.count, k); } }
   gl.disable(gl.POLYGON_OFFSET_FILL);
   // main pass
   gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); { const sk = i => Math.pow(1 - Math.exp(-S.fogC[i] * S.exposure), .4545); gl.clearColor(sk(0), sk(1), sk(2), 1); }       /* past the edge of the ground is haze, not black */
@@ -235,5 +236,5 @@ function renderScene(S, W, H) {
   gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND); gl.depthMask(false); gl.useProgram(PROG.part); const u = PROG.part.u; gl.uniformMatrix4fv(u.uVP, false, VP); gl.uniform3fv(u.uCam, S.cam); gl.uniform3f(u.uCamR, VIEW[0], VIEW[4], VIEW[8]); gl.uniform3f(u.uCamU, VIEW[1], VIEW[5], VIEW[9]);
   for (const [B, add] of [[PSMK, false], [PADD, true]]) if (B.n) { gl.blendFunc(gl.ONE, add ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); gl.bindVertexArray(B.vao); gl.bindBuffer(gl.ARRAY_BUFFER, B.buf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, B.data, 0, B.n * 12); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, B.n); }
   gl.depthMask(true); gl.disable(gl.BLEND); gl.bindVertexArray(null);
-  let ni = 0, nb = 0; for (const m of meshes) { ni += m.n; if (m.n) nb++; m.n = 0; } STATS.inst = ni; STATS.batches = nb; STATS.sprites = PADD.n + PSMK.n; STATS.decals = DEC.n; PADD.n = PSMK.n = DEC.n = 0;       // what this frame submitted, for the frame counter and the tests
+  let ni = 0, nb = 0; for (const m of meshes) { ni += m.n; if (m.n) nb++; m.n = 0; m.ns = -1; } STATS.inst = ni; STATS.batches = nb; STATS.sprites = PADD.n + PSMK.n; STATS.decals = DEC.n; PADD.n = PSMK.n = DEC.n = 0;       // what this frame submitted, for the frame counter and the tests
 }

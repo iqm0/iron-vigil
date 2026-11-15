@@ -15,7 +15,7 @@ Ten checks on the changes approved after the concept validation: the camera look
 ```bash
 node tests/sim.js 3
 ```
-Whole runs by three bots from fixed seeds: one that dodges and rams anything stuck, one that dodges and never rams, one that never moves. One line of JSON per run, with peak drawn instances. As of the approved changes the bot that never moves survives two runs of three with under a quarter of its hull, and the bot that dodges is never hit. Before them the first always died and the second took four to eight hits. That is an open tuning problem, not a pass.
+Whole runs by three bots from fixed seeds: one that dodges and rams anything stuck, one that dodges and never rams, one that never moves. One line of JSON per run, with peak drawn instances. As of the approved changes and the larger yard, the bot that never moves survives one run of three with 13% of its hull, and the bot that dodges is never hit. Before them the first always died and the second took four to eight hits. That is an open tuning problem, not a pass.
 
 ```bash
 node tests/shots.js
