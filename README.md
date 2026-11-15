@@ -6,14 +6,27 @@ Static site, no build step and no libraries: `index.html`, `js/engine.js` (a sma
 
 ## How it plays
 
-- **Hold the pad for six minutes**, until relief arrives. The clock at the top counts down.
+- **Hold the pad for six minutes**, until relief arrives. The clock at the top counts down. Holding a night opens the next one.
 - **Drag anywhere** to walk. The gun picks its own targets and fires while you move: the torso turns to the target on its own ring while the legs go where your thumb says.
 - **Dash** with the button (tap it, or drag it to aim). The thrusters fire, the ram plate comes forward, and anything in the way is thrown aside. You cannot be hurt during the burst.
 - **A red lane on the ground is a lunge about to land.** A bug rears up, the lane shows where it will go, and half a second later it leaps. Lunges are aimed at where you are heading, so change direction or dash across. Amber rings are your own mortar shells coming down.
+- **A red ring is acid about to land** (from night two). Spitters keep their distance and lob it at where you are heading; the pool stays for a few seconds.
 - Only a few bugs may attack at once. The rest circle and wait.
 - **The number of bugs alive has a ceiling** that rises slowly (6 at the start, 20 by the third minute). A strong build gets more kills, not a fuller screen. Every 40 seconds runs press, swarm, lull.
 - **A brood guard** (large, bone-plated) arrives about every 55 seconds. It charges down a long wide lane, and it always drops a part and a repair cell.
 - Keyboard: WASD or arrows, Space or Shift to dash, P or Esc to pause, M to mute.
+
+## Nights
+
+| Night | What it adds |
+|---|---|
+| 1 | Bugs and brood guards |
+| 2 | Spitters |
+| 3 | Brood guards in pairs, tougher bugs |
+| 4 | Faster bugs, shorter lulls, more lunging at once |
+| 5 | Everything at once, swarms from two sides |
+
+You can replay any night you have opened from the title screen.
 
 ## Parts
 
@@ -45,6 +58,7 @@ The first part of a run is always a rare one. Kinds of part you have found are r
 ## How it is drawn and animated
 
 - Everything solid is an instance of one of four meshes (bevelled box, cylinder, cone, sphere), lit per pixel. The work lamp is a real spotlight with a shadow map; fires, the gun and the thrusters are point lights.
+- The whole game runs at nine tenths speed. The torso snaps to a target quickly, but the lamp is on its own swivel and swings round slowly, so the light does not whip about.
 - Nothing is keyframed. Feet are planted on the ground and step when the body has moved far enough; knees are solved to reach them. Lean, recoil, the gun's kick, the ram arm and the antenna are springs. Bugs walk on two alternating tripods of legs the same way.
 - The ground texture is painted once at start-up, so each frame costs two texture lookups for it.
 - The 3D view is capped at 1.5 million pixels and drops its resolution, never its frame rate, if the device falls behind.
@@ -66,7 +80,7 @@ Not done: the action itself is visual and is not playable by screen reader; ther
 
 Checked in headless Chromium only, by stepping the game and looking at frames, and by scripted players. It has not been run on a phone, so frame rate on real devices is unknown.
 
-Difficulty is a guess. Scripted players that keep moving and pick up parts finish the six minutes almost unhurt; one that stands still dies in under a minute. The previous tuning, which a person found overwhelming after two minutes, was survivable for the same scripts, so they are a poor guide and the numbers were deliberately moved toward easy.
+Night one has been finished once by a person. Nights two to five are tuned against scripted players only, which are a poor guide: they finish nights one to three most of the time and are hit more on each.
 
 `window.advanceTime(ms)` and `window.render_game_to_text()` exist for automated checks. Skills used while designing this are in [`.claude/skills/`](.claude/skills/README.md).
 

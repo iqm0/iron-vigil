@@ -57,6 +57,8 @@ const sfx = {
   swarm() { tone(210, .5, 'sawtooth', .05, 160); noise(.5, .08, 2400, 'bandpass', 0, 1200); },
   item(r) { const b = r === 'e' ? 523 : r === 'r' ? 440 : 392, n = r === 'e' ? 4 : r === 'r' ? 3 : 2; for (let i = 0; i < n; i++) tone(b * [1, 1.25, 1.5, 2][i], .22, 'triangle', .09, 0, AC && AC.currentTime + i * .08); buzz(25); },
   repair() { tone(520, .1, 'sine', .08, 260); tone(780, .14, 'sine', .06, 0, AC && AC.currentTime + .08); },
+  spit() { noise(.2, .12, 900, 'bandpass', 0, 900); tone(210, .2, 'sine', .07, 260); },
+  splat() { noise(.25, .2, 600, 'lowpass', 0, -350); },
   mortar() { tone(120, .16, 'sine', .3, -70); noise(.12, .2, 500, 'lowpass'); },
   zap() { noise(.12, .14, 3200, 'highpass', 0, -1500); tone(880 * vr(), .09, 'sawtooth', .05, -600); },
   pew() { tone(620 * vr(), .05, 'square', .03, -300); },
@@ -76,9 +78,9 @@ function startMusic() {
 /* ---------- tuning ---------- */
 const HIP = 1.5, HIPW = .56, L1 = .98, L2 = 1.02, REACH = 1.93, STRIDE = 3.1, SWING = .42;
 const DASH = { wind: .045, burst: .2, rec: .3, v: 31 };
-const BUGV = 4.5, TELL = .5, LUNGE_T = .3, LUNGE_V = 17, LANE = LUNGE_T * LUNGE_V + .8, RUN = 360;
+const BUGV = 4.5, TELL = .5, LUNGE_T = .3, LUNGE_V = 17, LANE = LUNGE_T * LUNGE_V + .8, PACE = .9, RUN = 360 * PACE;      // the whole game runs at nine tenths speed; RUN is in game seconds, so a run lasts six real minutes
 const YEL = [.78, .47, .05], YEL2 = [.5, .3, .04], DRK = [.055, .06, .07], STL = [.24, .25, .28], RUST = [.24, .1, .045], CONC = [.3, .29, .27], BRASS = [.8, .55, .15];
-const CHIT = [.05, .032, .03], CHIT2 = [.26, .085, .03], BONE = [.6, .52, .4], ICH = [.32, .75, .08];
+const SPITC = [.12, .13, .05], SPITC2 = [.3, .32, .1], CHIT = [.05, .032, .03], CHIT2 = [.26, .085, .03], BONE = [.6, .52, .4], ICH = [.32, .75, .08];
 
 /* ---------- parts: the mech starts bare; bugs drop parts and they bolt themselves on ----------
    Rarity is the part's role: common parts tune what you have, rare parts are new weapons, epic parts change a rule.
@@ -133,22 +135,32 @@ function icon(c, id, x, y, r, col) { c.save(); c.translate(x, y); c.scale(r, r);
   else if (id === 'chain') { P(-.8, -.6, -.2, 0, -.8, .6); c.stroke(); P(-.2, -.6, .4, 0, -.2, .6); c.stroke(); c.lineWidth = .24; P(.8, -.7, .8, .7); c.stroke(); }
   else if (id === 'sear') { P(-.9, -.2, -.3, -.5, -.3, .5, -.9, .2); c.closePath(); c.fill(); P(0, -.5, .85, -.85); c.stroke(); P(.05, 0, .9, 0); c.stroke(); P(0, .5, .85, .85); c.stroke(); }
   c.restore(); }
-function inBeam(g, x, z) { const dx = x - g.x, dz = z - g.z, d = Math.hypot(dx, dz); return d < 19 && d > .5 && (dx * Math.sin(g.aim) + dz * Math.cos(g.aim)) / d > (g.s.sear ? .72 : .8); }
+function inBeam(g, x, z) { const dx = x - g.x, dz = z - g.z, d = Math.hypot(dx, dz); return d < 19 && d > .5 && (dx * Math.sin(g.lamp) + dz * Math.cos(g.lamp)) / d > (g.s.sear ? .72 : .8); }
 function blast(x, z, r, dmg, col) { const g = G; g.blasts.push({ x, z, r, dmg, col: col || [1, .55, .15], t: .07 }); }       // goes off a moment later, so chains ripple instead of all landing at once
 function doBlast(b) { const g = G; for (const e of g.en) { if (e.dead) continue; const dx = e.x - b.x, dz = e.z - b.z, d = Math.hypot(dx, dz) || 1; if (d < b.r + .5 * e.s) { e.kx += dx / d * 7; e.kz += dz / d * 7; hurtBug(e, b.dmg, dx / d, dz / d); } }
   const c = b.col; for (let i = 0; i < 9; i++) { const a = rand(0, TAU), v = rand(1, 5); part(0, b.x, rand(.4, 1), b.z, Math.sin(a) * v, rand(.5, 3), Math.cos(a) * v, rand(.2, .4), b.r * rand(.35, .6), c[0], c[1], c[2], .8, 0, 3, -1); } sparks(b.x, .6, b.z, 0, 0, 8, c[0], c[1], c[2], 9); mark(b.x, b.z, b.r * .8, b.r * .8, 0, 0, 0, 0, 0, .5, 8);
   g.pulse = { x: b.x, z: b.z, c, t: 1 }; g.trauma = Math.min(1, g.trauma + .1); sfx.blast(); }
 
+/* ---------- nights: holding one opens the next, and each names what it adds ---------- */
+const NIGHTS = [
+  { say: 'Bugs and brood guards.', hp: 1, cap: 0, spit: 0, guard: 55, pair: 200 * PACE, lull: .4, spd: 1, tok: 0 },
+  { say: 'Spitters arrive. Their acid lands where the red ring is, and stays.', hp: 1.12, cap: 0, spit: 3, guard: 55, pair: 200 * PACE, lull: .4, spd: 1, tok: 0 },
+  { say: 'Brood guards hunt in pairs. Tougher bugs.', hp: 1.3, cap: 2, spit: 3, guard: 50, pair: 40, lull: .4, spd: 1, tok: 0 },
+  { say: 'Faster bugs, shorter lulls, and more of them lunge at once.', hp: 1.45, cap: 3, spit: 4, guard: 50, pair: 40, lull: .65, spd: 1.1, tok: 1 },
+  { say: 'Everything at once, and more of it.', hp: 1.65, cap: 5, spit: 5, guard: 42, pair: 0, lull: .7, spd: 1.14, tok: 2 },
+];
+let OPEN = 1, night = 1; try { OPEN = clamp(+(localStorage.getItem('ll4_night') || 1) | 0, 1, NIGHTS.length); night = OPEN; } catch (e) { }
+
 /* ---------- state ---------- */
 let state = 'title', G = null, lastT = 0, stick = null, dbtn = null; const keys = {};
 const PT = [], DB = [], DL = [], TR = [];          // particles, debris, ground marks, tracers
 function newGame(demo) {
-  G = { demo, t: 0, kills: 0, hp: 100, x: 0, z: 0, vx: 0, vz: 0, pvx: 0, pvz: 0, head: demo ? .55 : 0, aim: demo ? .55 : 0, aimV: 0, phase: 0, py: HIP,
+  G = { demo, t: 0, kills: 0, hp: 100, x: 0, z: 0, vx: 0, vz: 0, pvx: 0, pvz: 0, head: demo ? .55 : 0, aim: demo ? .55 : 0, aimV: 0, lamp: demo ? .55 : 0, lampV: 0, phase: 0, py: HIP,
     feet: [0, 1].map(i => ({ x: (i ? -1 : 1) * HIPW, z: 0, y: 0, a: 0, sw: false, fx: 0, fz: 0 })),
     bob: S0(), lx: S0(), lz: S0(), roll: S0(), rec: S0(), kick: S0(), ram: S0(), crouch: S0(), antx: S0(), antz: S0(), fov: S0(), pitch: S0(),
     spin: 0, spinV: 0, fireT: 0, flash: 0, heat: 0, jet: 0, tgt: null, dash: null, dcd: 0, inv: 0, hurtT: 0, sinceHit: 9, trauma: 0, freeze: 0, boom: 0, dead: 0, smokeT: 0,
     cam: { x: 0, z: 0, d: demo ? .5 : 1 }, en: [], spawnT: 1.2, cap: null, muz: [-.6, 2.3, 1.7], lampP: [0, 2.9, 1], lampD: [0, -.2, 1],
-    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, s: baseStats() };
+    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, s: baseStats() };
   if (demo) { G.feet[0].x = Math.cos(.55) * HIPW; G.feet[0].z = -Math.sin(.55) * HIPW; G.feet[1].x = -G.feet[0].x; G.feet[1].z = -G.feet[0].z; G.feet[0].a = G.feet[1].a = .55; }
   PT.length = DB.length = DL.length = TR.length = 0; cardQ.length = 0;
 }
@@ -170,17 +182,18 @@ function sparks(x, y, z, dx, dz, n, r, g, b, spd) { for (let i = 0; i < n; i++) 
 function dust(x, z, n, spd, sz) { for (let i = 0; i < n; i++) { const a = rand(0, TAU), s = rand(.3, 1) * spd; part(1, x, rand(.1, .3), z, Math.sin(a) * s, rand(.3, 1.4), Math.cos(a) * s, rand(.5, 1), sz || .35, .2, .19, .17, .3, 0, 2.5, 1.3); } }
 
 /* ---------- bugs ---------- */
-function spawnBug(x, z, big) { const g = G, s = big ? 1.65 : rand(.8, .96), hp = 36 * (1 + g.t / 100 + (g.t / 260) ** 2) * (big ? 12 : 1); g.en.push({ x, z, a: Math.atan2(g.x - x, g.z - z), vx: 0, vz: 0, kx: 0, kz: 0, hp, s, big: !!big, state: 'chase', st: 0, cd: big ? 1.5 : rand(.2, 1), phase: Math.random(), legs: null, fl: S0(), rear: S0(), flash: 0, burnT: 0, bias: rand(-1, 1), ldx: 0, ldz: 1, la: 0, hitP: false, dead: false }); }
+function spawnBug(x, z, kind) { const g = G, big = kind === 'big' || kind === true, spit = kind === 'spit', s = big ? 1.65 : spit ? .9 : rand(.8, .96), hp = 36 * (1 + g.t / 100 + (g.t / 260) ** 2) * g.N.hp * (big ? 12 : spit ? .8 : 1); g.en.push({ x, z, a: Math.atan2(g.x - x, g.z - z), vx: 0, vz: 0, kx: 0, kz: 0, hp, s, big, spit, state: 'chase', st: 0, cd: big ? 1.5 : spit ? rand(1, 2) : rand(.2, 1), phase: Math.random(), legs: null, fl: S0(), rear: S0(), flash: 0, burnT: 0, bias: rand(-1, 1), ldx: 0, ldz: 1, la: 0, tx: 0, tz: 0, hitP: false, dead: false }); }
 const COMPASS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'], compass = a => COMPASS[((Math.round(a / (TAU / 8)) % 8) + 8) % 8];
 /* The number alive has a ceiling that rises slowly, so a strong build means more kills, not a fuller screen.
    Each 40 seconds runs press, surge, lull. A brood guard arrives every 55 seconds and always drops a part. The run ends at six minutes. */
-function spawnLogic(dt) { const g = G; if (g.demo || g.dead || g.won) return; const cyc = g.t % 40, last = g.t > RUN - 40, lull = cyc > 32 && !last, wave = Math.floor(g.t / 40);
-  let N = Math.min(20, 6 + g.t / 12); if (lull) N *= .4; if (last) N += 5; N = Math.round(N * ST.ecount); let alive = 0; for (const e of g.en) if (!e.big) alive++;
-  const ring = (a, r, big) => { const p = { x: g.x + Math.sin(a) * r, z: g.z + Math.cos(a) * r }; pushOut(p, .8); spawnBug(p.x, p.z, big); };
-  g.spawnT -= dt; if (g.spawnT <= 0 && alive < N) { g.spawnT = last ? .18 : lerp(.5, .2, clamp(g.t / 240, 0, 1)); const mv = Math.hypot(g.vx, g.vz) > 2; ring(mv && Math.random() < .5 ? Math.atan2(g.vx, g.vz) + rand(-1.1, 1.1) : rand(0, TAU), rand(19, 23)); }
-  if (cyc > 26 && g.surged < wave) { g.surged = wave; const a = rand(0, TAU), n = Math.round(Math.min(7, 3 + g.t / 60) * ST.ecount); for (let i = 0; i < n; i++) ring(a + rand(-.35, .35), rand(19, 25)); cap('Swarm from the ' + compass(a)); sfx.swarm(); }
-  g.eliteT -= dt; if (g.eliteT <= 0) { g.eliteT = 55; const a = rand(0, TAU); ring(a, 21, true); if (g.t > 200) ring(a + 2.4, 21, true); cap('Brood guard from the ' + compass(a) + '. It carries a part.'); sfx.swarm(); }
-  if (last && !g.lastSaid) { g.lastSaid = true; cap('Last push. Forty seconds.'); } }
+function spawnLogic(dt) { const g = G; if (g.demo || g.dead || g.won) return; const nt = g.N, cyc = g.t % 40, last = g.t > RUN - 36, lull = cyc > 32 && !last, wave = Math.floor(g.t / 40);
+  let N = Math.min(20, 6 + g.t / 12) + nt.cap; if (lull) N *= nt.lull; if (last) N += 5; N = Math.round(N * ST.ecount); let alive = 0, spitters = 0; for (const e of g.en) { if (!e.big) alive++; if (e.spit) spitters++; }
+  const ring = (a, r, kind) => { if (kind !== 'big' && g.en.length >= 30 + g.night) return; const p = { x: g.x + Math.sin(a) * r, z: g.z + Math.cos(a) * r }; pushOut(p, .8); spawnBug(p.x, p.z, kind); };      // never more on the pad than can be read
+  g.spawnT -= dt; if (g.spawnT <= 0 && alive < N) { g.spawnT = last ? .18 : lerp(.5, .2, clamp(g.t / 240, 0, 1)); const mv = Math.hypot(g.vx, g.vz) > 2, spit = nt.spit && g.t > 30 && spitters < Math.min(nt.spit, 1 + g.t / 70) && Math.random() < .25;
+    ring(mv && Math.random() < .5 ? Math.atan2(g.vx, g.vz) + rand(-1.1, 1.1) : rand(0, TAU), rand(19, 23), spit ? 'spit' : null); if (spit && !g.saidSpit) { g.saidSpit = true; cap('Spitters. A red ring marks where the acid will land.', 4); } }
+  if (cyc > 26 && g.surged < wave) { g.surged = wave; const a = rand(0, TAU), n = Math.round(Math.min(7, 3 + g.t / 60) * ST.ecount); for (let i = 0; i < n; i++) ring(a + rand(-.35, .35), rand(19, 25)); if (g.night > 4) for (let i = 0; i < n; i++) ring(a + Math.PI + rand(-.35, .35), rand(19, 25)); cap(g.night > 4 ? 'Swarms from two sides' : 'Swarm from the ' + compass(a)); sfx.swarm(); }
+  g.eliteT -= dt; if (g.eliteT <= 0) { g.eliteT = nt.guard; const a = rand(0, TAU), two = g.t > nt.pair; ring(a, 21, 'big'); if (two) ring(a + 2.4, 21, 'big'); cap((two ? 'Two brood guards. They carry parts.' : 'Brood guard from the ' + compass(a) + '. It carries a part.')); sfx.swarm(); }
+  if (last && !g.lastSaid) { g.lastSaid = true; cap('Last push.'); } }
 function hurtBug(e, dmg, dx, dz, ram) { const g = G; if (e.dead) return; e.hp -= dmg; e.flash = .09; e.fl.v += (ram ? 16 : 7) * (e.big ? .4 : 1); const kb = (ram ? 24 : 2.6) * (e.big ? .2 : 1); e.kx += dx * kb; e.kz += dz * kb;
   sparks(e.x - dx * .3, .55, e.z - dz * .3, -dx, -dz, ram ? 10 : 3, .7, 1, .25, 8); sfx.hit(); if (e.hp <= 0) killBug(e, dx, dz, ram); }
 function killBug(e, dx, dz, ram) { const g = G, s = e.s, f = ram ? 2.1 : 1; e.dead = true; g.kills++; sfx.kill();
@@ -196,9 +209,14 @@ function killBug(e, dx, dz, ram) { const g = G, s = e.s, f = ram ? 2.1 : 1; e.de
 function bugHome(e, i, sp, out) { const side = i < 3 ? 1 : -1, row = i % 3, s = e.s, lx = side * (.92 + (row === 1 ? .16 : 0)) * s, lz = (1 - row) * .8 * s, c = Math.cos(e.a), sn = Math.sin(e.a); let x = e.x + lx * c + lz * sn, z = e.z - lx * sn + lz * c; if (sp > .6) { x += e.vx / sp * .33 * s; z += e.vz / sp * .33 * s; } out[0] = x; out[1] = z; return out; }
 const _h = [0, 0]; let tokens = 0;
 function updBug(e, dt) { const g = G, dx = g.x - e.x, dz = g.z - e.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d; let mvx = 0, mvz = 0, face = Math.atan2(ux, uz); e.cd -= dt; e.st -= dt;
-  if (e.state === 'chase') {
-    if (d < (e.big ? 7.5 : 3.7) && e.cd <= 0 && !g.dead && !g.demo && !g.won && (e.big || tokens < Math.min(5, 2 + Math.floor(g.t / 70)))) { e.state = 'tell'; e.st = e.big ? .85 : TELL; if (!e.big) tokens++; const ld = rand(.35, .7), px = g.x + g.vx * ld - e.x, pz = g.z + g.vz * ld - e.z, l = Math.hypot(px, pz) || 1; e.ldx = px / l; e.ldz = pz / l; e.la = Math.atan2(e.ldx, e.ldz); sfx.tell(); }
-    else if (d > 2.7) { const fk = clamp((d - 3) / 8, 0, 1) * e.bias * .9, c = Math.cos(fk), s = Math.sin(fk), spd = (e.big ? 3.3 : BUGV * (1 + Math.min(.3, g.t / 700))) * ST.espd * (d > 13 ? 1.6 : 1) * (g.s.sear && inBeam(g, e.x, e.z) ? .65 : 1); mvx = (ux * c - uz * s) * spd; mvz = (uz * c + ux * s) * spd; }
+  if (e.spit) {       // keeps its distance and lobs acid at where you are heading; the landing spot is marked from the moment it winds up
+    if (e.state === 'chase') { const spd = 4 * ST.espd * g.N.spd * (g.s.sear && inBeam(g, e.x, e.z) ? .65 : 1), sd = e.bias > 0 ? 1 : -1; if (d > 10.5) { mvx = ux * spd * (d > 14 ? 1.6 : 1); mvz = uz * spd * (d > 14 ? 1.6 : 1); } else if (d < 6) { mvx = -ux * 3; mvz = -uz * 3; } else { mvx = -uz * sd * 1.3; mvz = ux * sd * 1.3; }
+      if (d < 12.5 && e.cd <= 0 && !g.dead && !g.demo && !g.won) { e.state = 'tell'; e.st = .75; let px = g.x + g.vx * .9 - e.x, pz = g.z + g.vz * .9 - e.z; const l = Math.hypot(px, pz) || 1, m = Math.min(l, 14); e.tx = e.x + px / l * m; e.tz = e.z + pz / l * m; e.la = Math.atan2(px, pz); sfx.tell(); } }
+    else if (e.state === 'tell') { face = e.la; if (e.st <= 0) { e.state = 'rec'; e.st = .5; e.cd = rand(2.6, 3.6); g.globs.push({ x0: e.x, z0: e.z, x1: e.tx, z1: e.tz, t: 0, dur: .8 }); sfx.spit(); } }
+    else { face = e.a; if (e.st <= 0) e.state = 'chase'; }
+  } else if (e.state === 'chase') {
+    if (d < (e.big ? 7.5 : 3.7) && e.cd <= 0 && !g.dead && !g.demo && !g.won && (e.big || tokens < Math.min(5, 2 + Math.floor(g.t / 70)) + g.N.tok)) { e.state = 'tell'; e.st = e.big ? .85 : TELL; if (!e.big) tokens++; const ld = rand(.35, .7), px = g.x + g.vx * ld - e.x, pz = g.z + g.vz * ld - e.z, l = Math.hypot(px, pz) || 1; e.ldx = px / l; e.ldz = pz / l; e.la = Math.atan2(e.ldx, e.ldz); sfx.tell(); }
+    else if (d > 2.7) { const fk = clamp((d - 3) / 8, 0, 1) * e.bias * .9, c = Math.cos(fk), s = Math.sin(fk), spd = (e.big ? 3.3 : BUGV * (1 + Math.min(.3, g.t / 700))) * ST.espd * g.N.spd * (d > 13 ? 1.6 : 1) * (g.s.sear && inBeam(g, e.x, e.z) ? .65 : 1); mvx = (ux * c - uz * s) * spd; mvz = (uz * c + ux * s) * spd; }
     else { const s = e.bias > 0 ? 1 : -1, back = d < 2.1 ? -2.2 : 0; mvx = -uz * s * 1.5 + ux * back; mvz = ux * s * 1.5 + uz * back; }      // no opening yet: circle and wait for a turn
   } else if (e.state === 'tell') { face = e.la; if (e.st <= 0) { e.state = 'lunge'; e.st = e.big ? .5 : LUNGE_T; e.hitP = false; sfx.lunge(); } }
   else if (e.state === 'lunge') { face = e.la; const lv = e.big ? 20 : LUNGE_V; mvx = e.ldx * lv; mvz = e.ldz * lv; if (!e.hitP && d < (e.big ? 2.1 : 1.3)) { e.hitP = true; hurtPlayer(e.big ? 22 : 12, e.ldx, e.ldz); } if (e.st <= 0) { e.state = 'rec'; e.st = e.big ? 1.3 : .6; dust(e.x, e.z, e.big ? 8 : 3, e.big ? 4 : 2); } }
@@ -253,7 +271,7 @@ function update(dt) { const g = G; g.t += dt;
   if (!g.dash || g.dash.skidded) { const k = 1 - Math.exp(-dt * (g.dash ? 8 : 13)), v = g.s.speed; g.vx += (ix * v - g.vx) * k; g.vz += (iz * v - g.vz) * k; }
   if (g.dead) { g.vx *= Math.exp(-dt * 6); g.vz *= Math.exp(-dt * 6); }
   const ax = (g.vx - g.pvx) / dt, az = (g.vz - g.pvz) / dt; g.pvx = g.vx; g.pvz = g.vz; g.x += g.vx * dt; g.z += g.vz * dt; pushOut(g, 1); const sp = Math.hypot(g.vx, g.vz);
-  if (sp > .8) g.head += clamp(angDiff(g.head, Math.atan2(g.vx, g.vz)), -dt * (g.dash ? 30 : 11), dt * (g.dash ? 30 : 11));
+  if (sp > .8) g.head += clamp(angDiff(g.head, Math.atan2(g.vx, g.vz)), -dt * (g.dash ? 30 : 8.5), dt * (g.dash ? 30 : 8.5));
   g.jet += ((burst ? 1 : 0) - g.jet) * Math.min(1, dt * (burst ? 40 : 7));
   if (burst) { const d = g.dash, bx = g.x - d.dx * 1.2, bz = g.z - d.dz * 1.2;
     for (let i = 0; i < 3; i++) part(2, bx + rand(-.4, .4), rand(1.7, 2.1), bz + rand(-.4, .4), -d.dx * rand(8, 18) + rand(-2, 2), rand(-1, 2), -d.dz * rand(8, 18) + rand(-2, 2), rand(.12, .28), .09, 1, rand(.5, .8), .2, 1, 0, 3, 0, .05);
@@ -267,7 +285,8 @@ function update(dt) { const g = G; g.t += dt;
   if (g.tgt && (g.tgt.dead || (g.tgt.x - g.x) ** 2 + (g.tgt.z - g.z) ** 2 > g.s.range * g.s.range)) g.tgt = null;
   if (near && (!g.tgt || nd < ((g.tgt.x - g.x) ** 2 + (g.tgt.z - g.z) ** 2) * .55 - 2)) g.tgt = near; if (!near) g.tgt = null;
   const t = g.tgt; let aimT = g.aim, dT = 8; if (burst) aimT = Math.atan2(g.dash.dx, g.dash.dz); else if (t) { aimT = Math.atan2(t.x + t.vx * .05 - g.x, t.z + t.vz * .05 - g.z); dT = Math.hypot(t.x - g.x, t.z - g.z); } else if (g.demo) aimT = .55 + Math.sin(g.t * .5) * .5; else if (sp > 1) aimT = g.head;
-  const da = angDiff(g.aim, aimT); g.aimV += (da * 230 - g.aimV * 25) * dt; g.aimV = clamp(g.aimV, -17, 17); g.aim += g.aimV * dt;
+  const da = angDiff(g.aim, aimT); g.aimV += (da * 230 - g.aimV * 30) * dt; g.aimV = clamp(g.aimV, -17, 17); g.aim += g.aimV * dt;
+  g.lampV += (angDiff(g.lamp, g.aim) * 30 - g.lampV * 11) * dt; g.lampV = clamp(g.lampV, -3.6, 3.6); g.lamp += g.lampV * dt;      // the lamp is on its own swivel: it follows the gun, but a quick snap of the torso does not throw the light around
   spring(g.pitch, t ? Math.atan2(1.7, dT + .5) : .12, 120, 18, dt);
   g.spinV += ((t && !g.dead ? 40 : 0) - g.spinV) * Math.min(1, dt * (t ? 9 : 2.2)); g.spin += g.spinV * dt;
   if (t && !burst && Math.abs(da) < .3 && g.spinV > 24) { g.fireT -= dt; while (g.fireT <= 0 && g.tgt) { g.fireT += 1 / g.s.rate; shoot(g); if (g.tgt.dead) g.tgt = null; } } else g.fireT = Math.min(g.fireT, .04);
@@ -285,9 +304,11 @@ function update(dt) { const g = G; g.t += dt;
     if (g.s.sear && tickNow) for (const e of g.en) if (!e.dead && inBeam(g, e.x, e.z) && (e.x - g.x) ** 2 + (e.z - g.z) ** 2 < 200) { hurtBug(e, g.s.dmg * .5 * g.s.sear, 0, 0); e.burnT = .3; }
   }
   for (let i = g.shells.length - 1; i >= 0; i--) { const sh = g.shells[i]; sh.t += dt; if (sh.t > 0 && Math.random() < dt * 40) { const u = sh.t / sh.dur; part(1, lerp(sh.x0, sh.x1, u), lerp(sh.y0, .3, u) + Math.sin(u * Math.PI) * 6, lerp(sh.z0, sh.z1, u), 0, .3, 0, .5, .2, .3, .28, .25, .35, 0, 1, .6); } if (sh.t >= sh.dur) { g.shells.splice(i, 1); blast(sh.x1, sh.z1, 3.1, g.s.dmg * 5); } }
+  for (let i = g.globs.length - 1; i >= 0; i--) { const b = g.globs[i]; b.t += dt; if (b.t >= b.dur) { g.globs.splice(i, 1); g.pools.push({ x: b.x1, z: b.z1, t: 3.6, seed: rand(0, 9) }); sfx.splat(); for (let k = 0; k < 8; k++) { const a = rand(0, TAU), v = rand(1, 4); part(0, b.x1, .3, b.z1, Math.sin(a) * v, rand(1, 4), Math.cos(a) * v, rand(.25, .45), rand(.3, .5), .7, .9, .15, .7, 10, 1, -.5); } if (Math.hypot(g.x - b.x1, g.z - b.z1) < 2) hurtPlayer(10, 0, 0); } }
+  for (let i = g.pools.length - 1; i >= 0; i--) { const q = g.pools[i]; q.t -= dt; if (q.t <= 0) { g.pools.splice(i, 1); continue; } if (q.t > .4 && Math.hypot(g.x - q.x, g.z - q.z) < 1.8) hurtPlayer(6, 0, 0); if (Math.random() < dt * 5) part(0, q.x + rand(-1.2, 1.2), .15, q.z + rand(-1.2, 1.2), 0, rand(.8, 1.6), 0, .5, .22, .7, .9, .15, .5, 0, 1, -.2); }
   for (let i = g.bolts.length - 1; i >= 0; i--) { g.bolts[i].t -= dt; if (g.bolts[i].t <= 0) g.bolts.splice(i, 1); }
   g.shieldT -= dt;
-  if (!g.demo && !g.dead && !g.won && g.t >= RUN) { g.won = .001; g.inv = 9; cap('Relief has arrived. Shift over.'); sfx.win(); for (const e of g.en) { const ex = e.x - g.x, ez = e.z - g.z, d = Math.hypot(ex, ez) || 1; hurtBug(e, 1e9, ex / d, ez / d); } g.pulse = { x: g.x, z: g.z, c: [1, .9, .7], t: 1 }; }
+  if (!g.demo && !g.dead && !g.won && g.t >= RUN) { g.won = .001; g.inv = 9; cap('Relief has arrived.'); sfx.win(); for (const e of g.en) { const ex = e.x - g.x, ez = e.z - g.z, d = Math.hypot(ex, ez) || 1; hurtBug(e, 1e9, ex / d, ez / d); } g.pulse = { x: g.x, z: g.z, c: [1, .9, .7], t: 1 }; }
   if (g.won) { g.won += dt; if (g.won > 2.4 && state === 'play') endGame(true); }
   if (whineG) { whineG.gain.value = state === 'play' ? Math.min(.035, g.spinV * .001) : 0; whine.frequency.value = 50 + g.spinV * 5; }
   // the body: planted feet, and springs for everything that should feel like mass
@@ -301,7 +322,7 @@ function update(dt) { const g = G; g.t += dt;
     else part(1, g.x + k * c - .9 * s, g.py + 1.75, g.z - k * s - .9 * c, rand(-.3, .3), rand(1, 1.8), rand(-.3, .3), 1.1, .16, .16, .16, .17, .22, 0, .8, .5); }
   if (g.dead) { g.dead += dt; if (g.dead > 1.9 && state === 'play') endGame(false); }
   // bugs
-  tokens = 0; for (const e of g.en) if (e.state === 'tell' || e.state === 'lunge') tokens++;
+  tokens = 0; for (const e of g.en) if (!e.spit && !e.big && (e.state === 'tell' || e.state === 'lunge')) tokens++;
   for (const e of g.en) updBug(e, dt);
   for (let i = 0; i < g.en.length; i++) { const a = g.en[i]; if (a.dead) continue;
     for (let j = i + 1; j < g.en.length; j++) { const b = g.en[j]; if (b.dead) continue; const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz, m = .85 * (a.s + b.s); if (d2 < m * m && d2 > 1e-6) { const d = Math.sqrt(d2), p = (m - d) * .5 / d; a.x -= dx * p; a.z -= dz * p; b.x += dx * p; b.z += dz * p; } }
@@ -358,8 +379,9 @@ function drawMech(g) {
   box(0, .56, .04, 1.32, .96, 1.12, YEL); box(0, .16, .5, 1.0, .3, .34, DRK, -.6);                         // cab and chin
   box(-.08, .78, .61, .9, .17, .05, [.9, .5, .12], .55); box(-.08, .92, .65, 1.04, .1, .2, YEL2); box(-.08, .64, .63, 1.04, .08, .1, DRK); box(.3, .4, .62, .5, .3, .06, YEL2); box(-.36, .42, .62, .3, .22, .05, DRK);          // a visor slit under a hood, patched plating below
   box(0, 1.08, -.05, .7, .1, .7, YEL2); box(.66, .56, .1, .05, .5, .7, DRK); box(-.66, .56, .1, .05, .5, .7, DRK);
-  box(.44, 1.1, .3, .3, .12, .5, DRK); push(); T(.44, 1.24, .46); RX(Math.PI / 2 - .5); draw(MESH.cyl, .42, .3, .42, DRK, -.7); T(0, .15, 0); draw(MESH.cyl, .33, .03, .33, g.s.sear ? [1, .7, .35] : [1, .92, .75], 3); pop(); xf(.44, 1.2, .64, _B); glow(_B[0], _B[1], _B[2], .7, 1, .9, .7, .75);      // the one big work lamp, bolted on off-centre
-  xf(.44, 1.2, .95, g.lampP); xfd(-.08, -.62, 1, g.lampD);
+  box(.44, 1.1, .3, .34, .1, .34, DRK); push(); T(.44, 1.18, .3); RY(angDiff(g.aim, g.lamp)); draw(MESH.cyl, .2, .14, .2, STL, -.8);       // the one big work lamp, bolted on off-centre, on a swivel
+    push(); T(0, .12, .16); RX(Math.PI / 2 - .5); draw(MESH.cyl, .42, .3, .42, DRK, -.7); T(0, .15, 0); draw(MESH.cyl, .33, .03, .33, g.s.sear ? [1, .7, .35] : [1, .92, .75], 3); pop();
+    xf(0, .08, .34, _B); glow(_B[0], _B[1], _B[2], .7, 1, .9, .7, .75); xf(0, .06, .66, g.lampP); xfd(0, -.62, 1, g.lampD); pop();
   box(0, .58, -.76, 1.08, .84, .5, DRK, -.6); box(0, .9, -1.03, .8, .12, .06, STL); box(0, .66, -1.03, .8, .12, .06, STL); box(0, .42, -1.03, .8, .12, .06, STL);                // engine and its grille
   for (const k of [-1, 1]) { push(); T(k * .4, 1.3, -.84); draw(MESH.cyl, .15, .8, .15, STL, -.8); T(0, .36, 0); draw(MESH.cyl, .19, .1, .19, RUST); pop();
     push(); T(k * .3, .34, -1.06); RX(-Math.PI / 2); draw(MESH.cyl, .34, .26, .34, STL, -.8); if (g.jet > .03) { const L = (1.5 + Math.sin(g.t * 90 + k) * .25) * g.jet; T(0, .1 + L / 2, 0); draw(MESH.cone, .3, L, .3, [1, .55, .15], 5 * g.jet); T(0, -L * .2, 0); draw(MESH.cone, .15, L * .55, .15, [.8, .9, 1], 7 * g.jet); } pop(); }
@@ -385,13 +407,15 @@ function drawMech(g) {
   push(); T(lerp(1.2, .0, r), lerp(.02, .5, r), lerp(.5, 1.4, r) + sw); RY(lerp(1.38, 0, r)); RX(lerp(0, -.12, r));
     draw(MESH.cube, 1.36, 1.1, .13, YEL); box(0, .52, .03, 1.4, .1, .2, STL, -.8); box(0, -.52, .06, 1.4, .12, .26, STL, -.8); for (const k of [-.36, 0, .36]) { push(); T(k, 0, .07); RZ(.6); draw(MESH.cube, .13, 1.0, .02, DRK); pop(); } pop();
 }
-function drawBug(e, g) { const s = e.s, tell = e.state === 'tell', E = e.flash > 0 ? (ST.flash ? .3 : .8) : ST.contrast ? .35 : -.5, C = e.flash > 0 ? [.3, .2, .12] : ST.contrast ? [.3, .2, .34] : CHIT, C2 = e.flash > 0 ? C : CHIT2;
+function drawBug(e, g) { const s = e.s, tell = e.state === 'tell', E = e.flash > 0 ? (ST.flash ? .3 : .8) : ST.contrast ? .35 : -.5, C = e.flash > 0 ? [.3, .2, .12] : ST.contrast ? [.3, .2, .34] : e.spit ? SPITC : CHIT, C2 = e.flash > 0 ? C : e.spit ? SPITC2 : CHIT2;
   const by = (.5 + Math.sin(e.phase * TAU * 2) * .025 + e.rear.x * .1 + (e.state === 'lunge' ? .18 : 0)) * s, ca = Math.cos(e.a), sa = Math.sin(e.a);
   decal(e.x, e.z, 1.0 * s, 1.35 * s, e.a, 0, 0, 0, 0, .5);
-  if (tell) { const k = 1 - e.st / (e.big ? .85 : TELL), hc = ST.contrast, LANE = e.big ? 10.8 : LUNGE_T * LUNGE_V + .8; decal(e.x + e.ldx * LANE / 2, e.z + e.ldz * LANE / 2, e.big ? 1.25 : .62, LANE / 2, e.la, 2, hc ? 1 : .95, hc ? .8 : .1, hc ? .6 : .04, (hc ? .5 : .3) + k * .4, .01); }
+  if (tell && e.spit) { const k = 1 - e.st / .75, hc = ST.contrast; decal(e.tx, e.tz, 1.9, 1.9, 0, 1, 1, hc ? .8 : .12, hc ? .6 : .05, (hc ? .6 : .4) + k * .4, .012); }
+  else if (tell) { const k = 1 - e.st / (e.big ? .85 : TELL), hc = ST.contrast, LANE = e.big ? 10.8 : LUNGE_T * LUNGE_V + .8; decal(e.x + e.ldx * LANE / 2, e.z + e.ldz * LANE / 2, e.big ? 1.25 : .62, LANE / 2, e.la, 2, hc ? 1 : .95, hc ? .8 : .1, hc ? .6 : .04, (hc ? .5 : .3) + k * .4, .01); }
   reset(); T(e.x, by, e.z); RY(e.a); T(0, 0, -e.fl.x * .22); RX(-e.rear.x * .5 - e.fl.x * .12);
   draw(MESH.sph, .8 * s, .5 * s, .92 * s, C, E); push(); T(0, .2 * s, -.02 * s); RX(-.12); draw(MESH.cube, .52 * s, .14 * s, .74 * s, C2, E > 0 ? E : -.6); pop();
-  push(); T(0, .12 * s, -.86 * s); RX(.22 + Math.sin(g.t * 7 + e.bias * 9) * .05); draw(MESH.sph, .92 * s, .64 * s, 1.24 * s, C, E); for (const k of [-1, 1]) { push(); T(k * .3 * s, .16 * s, -.08 * s); draw(MESH.sph, .16 * s, .14 * s, .34 * s, ICH, 1.1 + Math.sin(g.t * 5 + e.bias * 20) * .4); pop(); } box(0, .26 * s, .12 * s, .5 * s, .1 * s, .4 * s, C2, E > 0 ? E : -.6); pop();
+  if (e.spit) { push(); T(0, .34 * s, -.8 * s); RX(-.5 - e.rear.x * .4); const pu = 1 + (tell ? Math.sin(g.t * 30) * .06 + .12 : Math.sin(g.t * 3 + e.bias * 9) * .04); draw(MESH.sph, 1.05 * s * pu, .95 * s * pu, 1.3 * s * pu, [.6, .75, .1], e.flash > 0 ? E : tell ? 1.3 : .45); T(0, .2 * s, .5 * s); draw(MESH.cone, .3 * s, .5 * s, .3 * s, C2, E > 0 ? E : -.5); pop(); xf(0, .5 * s, -.9 * s, _B); glow(_B[0], _B[1], _B[2], (tell ? 2.2 : 1.4) * s, .7, .9, .15, tell ? .5 : .25); }       // the spitter is mostly a swollen acid sac
+  else { push(); T(0, .12 * s, -.86 * s); RX(.22 + Math.sin(g.t * 7 + e.bias * 9) * .05); draw(MESH.sph, .92 * s, .64 * s, 1.24 * s, C, E); for (const k of [-1, 1]) { push(); T(k * .3 * s, .16 * s, -.08 * s); draw(MESH.sph, .16 * s, .14 * s, .34 * s, ICH, 1.1 + Math.sin(g.t * 5 + e.bias * 20) * .4); pop(); } box(0, .26 * s, .12 * s, .5 * s, .1 * s, .4 * s, C2, E > 0 ? E : -.6); pop(); }
   push(); T(0, -.02 * s, .6 * s); RX(.25 - e.rear.x * .25); draw(MESH.sph, .54 * s, .42 * s, .58 * s, C, E);
     for (const k of [-1, 1]) { push(); T(k * .17 * s, .09 * s, .2 * s); draw(MESH.sph, .14 * s, .12 * s, .14 * s, tell ? [1, .25, .1] : [.75, 1, .2], tell ? 4 : 2.5); pop(); xf(k * .17 * s, .09 * s, .24 * s, _B); glow(_B[0], _B[1], _B[2], (tell ? .7 : .38) * s, tell ? 1 : .6, tell ? .25 : 1, .15, .55);
       push(); T(k * .13 * s, -.1 * s, .2 * s); RY(k * (.3 + (tell ? .5 : Math.abs(Math.sin(g.t * 9 + e.bias * 7)) * .25))); RX(Math.PI / 2); T(0, .22 * s, 0); draw(MESH.cone, .12 * s, .5 * s, .09 * s, BONE, 0); pop(); } pop();
@@ -417,6 +441,8 @@ function render() { const g = G; if (!GLOK) return; const fires = [];
   for (const sh of g.shells) { if (sh.t < 0) continue; const u = sh.t / sh.dur, x = lerp(sh.x0, sh.x1, u), y = lerp(sh.y0, .3, u) + Math.sin(u * Math.PI) * 6, z = lerp(sh.z0, sh.z1, u); reset(); T(x, y, z); draw(MESH.sph, .34, .34, .34, DRK, -.8); glow(x, y, z, .8, 1, .6, .2, .7); decal(sh.x1, sh.z1, 3.1, 3.1, 0, 1, 1, .65, .15, .25 + u * .45, .012); decal(x, z, .35, .35, 0, 0, 0, 0, 0, .4); }
   for (const b of g.bolts) { const a = Math.min(1, b.t / .08); for (let i = 1; i < b.pts.length; i++) { const A = b.pts[i - 1], B = b.pts[i]; let px = A[0], py = A[1], pz = A[2]; for (let k = 1; k <= 4; k++) { const u = k / 4, j = k < 4 ? .45 : 0, qx = lerp(A[0], B[0], u) + rand(-j, j), qy = lerp(A[1], B[1], u) + rand(-j, j), qz = lerp(A[2], B[2], u) + rand(-j, j); sprite(PADD, (px + qx) / 2, (py + qy) / 2, (pz + qz) / 2, .11, 0, (qx - px) / 2, (qy - py) / 2, (qz - pz) / 2, .6, .8, 1, a); px = qx; py = qy; pz = qz; } glow(B[0], B[1], B[2], 1.1, .5, .7, 1, .6 * a); } }
   for (const d of g.drones) { reset(); T(d.x, d.y, d.z); RY(d.a); draw(MESH.cube, .4, .18, .5, DRK, -.7); box(0, -.02, .26, .14, .1, .08, [.3, .9, 1], 2.5); for (const k of [-1, 1]) { push(); T(k * .34, .1, 0); draw(MESH.cyl, .46, .03, .46, STL, -.8); pop(); box(k * .2, .04, 0, .3, .05, .08, STL); } glow(d.x, d.y, d.z + .1, .5 + d.fl * .6, .3, .9, 1, .5 + d.fl * .4); decal(d.x, d.z, .4, .4, 0, 0, 0, 0, 0, .3); }
+  for (const b of g.globs) { const u = b.t / b.dur, x = lerp(b.x0, b.x1, u), y = .8 + Math.sin(u * Math.PI) * 5, z = lerp(b.z0, b.z1, u), hc = ST.contrast; reset(); T(x, y, z); draw(MESH.sph, .42, .42, .42, [.65, .85, .12], 1.6); glow(x, y, z, 1.1, .7, .9, .15, .6); decal(b.x1, b.z1, 1.9, 1.9, 0, 1, 1, hc ? .8 : .12, hc ? .6 : .05, .9, .012); decal(b.x1, b.z1, 1.9 * u, 1.9 * u, 0, 0, 1, .1, .04, .3, .011); decal(x, z, .4, .4, 0, 0, 0, 0, 0, .4); }
+  for (const q of g.pools) { const k = Math.min(1, q.t * 1.5), hc = ST.contrast; decal(q.x, q.z, 2.3, 2.3, q.seed, 3, .5, .65, .08, .6 * k, .011, q.seed); decal(q.x, q.z, 1.85, 1.85, 0, 1, 1, hc ? .8 : .15, hc ? .6 : .05, (hc ? .9 : .55) * k, .013); }
   for (const f of g.fires) decal(f.x, f.z, 1.2, 1.2, 0, 0, 1, .4, .06, .32 * Math.min(1, f.t), .01);
   if (g.itemFx > 0 && !g.dead) { const c = g.itemCol, k = g.itemFx; glow(g.x, 2, g.z, 3 + (1 - k) * 5, c[0], c[1], c[2], .5 * k); decal(g.x, g.z, 1.5 + (1 - k) * 4, 1.5 + (1 - k) * 4, 0, 1, c[0], c[1], c[2], .8 * k, .01); }
   for (const b of DB) { const k = Math.min(1, (b.life - b.t) * 3); reset(); T(b.x, b.y, b.z); RY(b.ay); RX(b.ax); draw(b.mesh, b.sx * k, b.sy * k, b.sz * k, b.col, b.e); }
@@ -451,7 +477,7 @@ function hud() { const g = G; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearR
   const bw = Math.min(150, W * .34), bh = hc ? 12 : 8, bx = 14, by = SAFE + 18, k = clamp(g.hp / g.s.maxhp, 0, 1); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4); ctx.fillStyle = k < .3 ? '#ff4a2e' : '#f2b01e'; ctx.fillRect(bx, by, bw * k, bh); ctx.strokeStyle = hc ? '#fff' : 'rgba(230,223,208,.5)'; ctx.lineWidth = 1; ctx.strokeRect(bx - 1.5, by - 1.5, bw + 3, bh + 3);
   ctx.font = `600 ${11 * ts}px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = '#e6dfd0'; ctx.fillText('HULL' + (ST.nums ? ' ' + Math.ceil(g.hp) : ''), bx, by + bh + 6);
   g.items.forEach((id, i) => { const it = ITEM[id], c = RAR[it.r].css, ix = bx + 11 + (i % 7) * 27, iy = by + bh + 26 + 12 * ts + Math.floor(i / 7) * 34; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.arc(ix, iy, 12, 0, TAU); ctx.fill(); ctx.strokeStyle = c; ctx.lineWidth = hc ? 2 : 1; ctx.stroke(); icon(ctx, id, ix, iy, 7, c); ctx.fillStyle = c; for (let k = 0; k < g.lv[id] && it.max > 1; k++) ctx.fillRect(ix - (g.lv[id] * 6 - 2) / 2 + k * 6, iy + 14, 4, 3); });      // fitted parts: icon, with a pip per mark
-  ctx.textAlign = 'center'; ctx.font = `600 ${18 * ts}px ${FONT}`; ctx.fillStyle = '#e6dfd0'; ctx.fillText(fmtT(Math.max(0, Math.ceil(RUN - g.t))), W / 2, SAFE + 14); ctx.font = `600 ${11 * ts}px ${FONT}`; ctx.fillStyle = '#a8a294'; ctx.fillText('TO RELIEF · ' + g.kills + ' KILLS', W / 2, SAFE + 16 + 20 * ts);
+  ctx.textAlign = 'center'; ctx.font = `600 ${18 * ts}px ${FONT}`; ctx.fillStyle = '#e6dfd0'; ctx.fillText(fmtT(Math.max(0, Math.ceil((RUN - g.t) / PACE))), W / 2, SAFE + 14); ctx.font = `600 ${11 * ts}px ${FONT}`; ctx.fillStyle = '#a8a294'; ctx.fillText('NIGHT ' + g.night + ' · ' + g.kills + ' KILLS', W / 2, SAFE + 16 + 20 * ts);
   const P = pauseBtn(); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(P.x, P.y, P.r, 0, TAU); ctx.fill(); ctx.fillStyle = '#e6dfd0'; ctx.fillRect(P.x - 7, P.y - 8, 5, 16); ctx.fillRect(P.x + 2, P.y - 8, 5, 16);
   // dash button, with its recharge as a ring
   const B = dashBtn(), rdy = g.dcd <= 0, cdk = clamp(1 - g.dcd / g.s.dashCd, 0, 1); ctx.fillStyle = rdy ? 'rgba(242,176,30,.2)' : 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(B.x, B.y, B.r, 0, TAU); ctx.fill(); ctx.lineWidth = hc ? 5 : 3; ctx.strokeStyle = 'rgba(230,223,208,.25)'; ctx.stroke();
@@ -471,9 +497,11 @@ function show(id) {
 function startGame() { if (!GLOK) return; initAudio(); const cam = G ? G.cam : null; newGame(false); if (cam) G.cam.d = cam.d; state = 'play'; show(''); lastT = performance.now();
   if (FOUND.length) equip(pick(FOUND), 'Carried over'); else announce('Run started. Drag to walk. The gun fires on its own.'); }      // one part you have found before comes with you
 const partLi = id => { const it = ITEM[id], l = G.lv[id]; return `<li><b style="color:${RAR[it.r].css}">${it.n}</b> <span class="rr">${RAR[it.r].n}${it.max > 1 ? ' · ' + MK[l] : ''}</span><br>${it.d(l)}</li>`; };
-function titleInfo() { let w = 0; try { w = +(localStorage.getItem('ll4_wins') || 0); } catch (e) { } $('found').textContent = (FOUND.length ? `Parts found: ${FOUND.length} of ${ITEMS.length}. One comes with you each run.` : 'You start bare. Bugs drop parts, and they bolt themselves on.') + (w ? ` Shifts held: ${w}.` : ''); }
-function endGame(win) { const g = G; state = 'over'; stick = null; dbtn = null; cardQ.length = 0; const t = Math.min(g.t, RUN); let best = 0, wins = 0; try { best = +(localStorage.getItem('ll4_best') || 0); wins = +(localStorage.getItem('ll4_wins') || 0); if (t > best) localStorage.setItem('ll4_best', Math.floor(t)); if (win) localStorage.setItem('ll4_wins', ++wins); } catch (e) { } $('overT').textContent = win ? 'Shift over' : 'Wrecked';
-  $('stats').innerHTML = (win ? 'Relief arrived. The pad held.<br>' : '') + `Held for <b>${fmtT(t)}</b> of ${fmtT(RUN)}<br>Kills <b>${g.kills}</b><br>Best <b>${fmtT(Math.max(best, t))}</b>` + (wins ? ` · Shifts held <b>${wins}</b>` : '') + `<br>Parts fitted <b>${g.parts}</b> · kinds found so far <b>${FOUND.length}</b> of ${ITEMS.length}` + (g.fresh.length ? `<br>New: <b>${g.fresh.map(id => ITEM[id].n).join(', ')}</b>` : ''); $('overParts').innerHTML = g.items.map(partLi).join(''); titleInfo(); announce($('overT').textContent + '. ' + $('stats').innerText.replace(/\n+/g, '. ')); show('over'); }
+function nightUI() { const sel = $('night'); sel.innerHTML = ''; for (let i = 1; i <= OPEN; i++) { const o = document.createElement('option'); o.value = i; o.textContent = 'Night ' + i; if (i === night) o.selected = true; sel.appendChild(o); } $('nightSay').textContent = NIGHTS[night - 1].say + (OPEN < NIGHTS.length && night === OPEN ? ' Hold it to open night ' + (OPEN + 1) + '.' : ''); $('againBtn').textContent = 'Start night ' + night; $('startBtn').textContent = 'Start night ' + night; }
+$('night').addEventListener('change', e => { night = clamp(+e.target.value | 0, 1, OPEN); nightUI(); });
+function titleInfo() { nightUI(); let w = 0; try { w = +(localStorage.getItem('ll4_wins') || 0); } catch (e) { } $('found').textContent = (FOUND.length ? `Parts found: ${FOUND.length} of ${ITEMS.length}. One comes with you each run.` : 'You start bare. Bugs drop parts, and they bolt themselves on.') + (w ? ` Nights held: ${w}.` : ''); }
+function endGame(win) { const g = G; state = 'over'; stick = null; dbtn = null; cardQ.length = 0; const t = Math.min(g.t, RUN) / PACE; let best = 0, wins = 0; try { best = +(localStorage.getItem('ll4_best') || 0); wins = +(localStorage.getItem('ll4_wins') || 0); if (t > best) localStorage.setItem('ll4_best', Math.floor(t)); if (win) localStorage.setItem('ll4_wins', ++wins); } catch (e) { } $('overT').textContent = win ? 'Night ' + g.night + ' held' : 'Wrecked'; let opened = 0; if (win && g.night === OPEN && OPEN < NIGHTS.length) { OPEN++; opened = OPEN; night = OPEN; try { localStorage.setItem('ll4_night', OPEN); } catch (e) { } } else if (win && g.night < OPEN) night = g.night + 1;
+  $('stats').innerHTML = (win ? 'Relief arrived. The pad held.<br>' : '') + (opened ? `<b>Night ${opened} is open.</b> ${NIGHTS[opened - 1].say}<br>` : '') + `Night ${g.night} · held for <b>${fmtT(t)}</b> of ${fmtT(RUN / PACE)}<br>Kills <b>${g.kills}</b><br>Best <b>${fmtT(Math.max(best, t))}</b>` + (wins ? ` · Nights held <b>${wins}</b>` : '') + `<br>Parts fitted <b>${g.parts}</b> · kinds found so far <b>${FOUND.length}</b> of ${ITEMS.length}` + (g.fresh.length ? `<br>New: <b>${g.fresh.map(id => ITEM[id].n).join(', ')}</b>` : ''); $('overParts').innerHTML = g.items.map(partLi).join(''); titleInfo(); announce($('overT').textContent + '. ' + $('stats').innerText.replace(/\n+/g, '. ')); show('over'); }
 function togglePause() { if (state === 'card') return; if (state === 'play') { state = 'paused'; stick = null; dbtn = null; $('build').innerHTML = G.items.length ? G.items.map(partLi).join('') : '<li>No parts fitted yet.</li>'; announce('Paused'); show('pause'); } else if (state === 'paused') { if (cardQ.length) openCard(); else { state = 'play'; show(''); lastT = performance.now(); } } }
 $('startBtn').onclick = startGame; $('againBtn').onclick = startGame; $('resumeBtn').onclick = togglePause; $('quitBtn').onclick = () => { if (state === 'paused') endGame(false); }; $('partOk').onclick = closeCard;
 
@@ -558,7 +586,7 @@ cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e
 
 /* ---------- loop ---------- */
 let emaDt = 16.7, lastQ = 0, fpsN = 0, fpsT = 0; const fpsEl = $('fps'), showFps = /[?&]fps/.test(location.search); if (showFps) fpsEl.style.display = 'block';
-function step(dt) { const g = G; if (state !== 'play' && state !== 'title') return; let ts = state === 'play' ? ST.tscale : 1; if (g.freeze > 0) { g.freeze -= dt; ts *= .06; } update(Math.max(1e-4, dt * ts)); camUpdate(dt); }
+function step(dt) { const g = G; if (state !== 'play' && state !== 'title') return; let ts = PACE * (state === 'play' ? ST.tscale : 1); if (g.freeze > 0) { g.freeze -= dt; ts *= .06; } update(Math.max(1e-4, dt * ts)); camUpdate(dt); }
 function frame(now) {
   requestAnimationFrame(frame); const raw = now - lastT, dt = clamp((raw || 0) / 1000, 0, .05); lastT = now;
   if (raw < 100 && raw > 0) { emaDt = emaDt * .96 + raw * .04; if (now - lastQ > 2500 && emaDt > 21 && Q > .5) { Q = Math.max(.5, Q - .17); lastQ = now; emaDt = 16.7; resize(); } }     // drop resolution rather than frames
@@ -567,7 +595,7 @@ function frame(now) {
 }
 /* hooks for automated checks: step the game by a fixed amount and read its state as text */
 window.advanceTime = ms => { for (let t = 0; t < ms; t += 1000 / 60) step(1 / 60); render(); };
-window.render_game_to_text = () => { const g = G; return JSON.stringify({ state, items: g.items.map(id => id + g.lv[id]), drops: g.drops.length, t: +g.t.toFixed(2), hp: Math.round(g.hp), kills: g.kills, pos: [+g.x.toFixed(2), +g.z.toFixed(2)], vel: [+g.vx.toFixed(2), +g.vz.toFixed(2)], dash: g.dash ? +g.dash.t.toFixed(2) : null, dashCd: +Math.max(0, g.dcd).toFixed(2), target: !!g.tgt, bugs: g.en.map(e => ({ x: +e.x.toFixed(1), z: +e.z.toFixed(1), st: e.state, hp: Math.round(e.hp) })) }); };
+window.render_game_to_text = () => { const g = G; return JSON.stringify({ state, night: g.night, items: g.items.map(id => id + g.lv[id]), drops: g.drops.length, t: +g.t.toFixed(2), hp: Math.round(g.hp), kills: g.kills, pos: [+g.x.toFixed(2), +g.z.toFixed(2)], vel: [+g.vx.toFixed(2), +g.vz.toFixed(2)], dash: g.dash ? +g.dash.t.toFixed(2) : null, dashCd: +Math.max(0, g.dcd).toFixed(2), target: !!g.tgt, bugs: g.en.map(e => ({ x: +e.x.toFixed(1), z: +e.z.toFixed(1), st: e.state, hp: Math.round(e.hp) })) }); };
 
 applySettings(); resize(); newGame(true); titleInfo(); cv.style.visibility = 'hidden';
 try { GLOK = initGL(glc); } catch (e) { GLOK = false; console.error(e); }

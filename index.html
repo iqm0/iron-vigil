@@ -42,6 +42,8 @@ button:disabled{opacity:.5;cursor:default}
 #partR{font-weight:700}
 #partM{text-transform:none;letter-spacing:.02em;font-size:.92rem;margin-bottom:18px}
 .parts .rr{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+#night{min-height:44px;font:inherit;font-size:1rem;font-weight:600;background:#14110a;color:var(--amber);border:1px solid var(--line);padding:6px 12px;margin:2px 0 6px}
+#nightSay{font-size:.92rem;line-height:1.35;color:var(--bone);max-width:330px;margin:0 auto 10px}
 #found{letter-spacing:.06em;text-transform:none;font-size:.9rem;max-width:330px}
 #setBody{width:min(460px,100%);text-align:left;margin:10px 0 14px}
 #setBody fieldset{border:1px solid var(--line);margin:0 0 14px;padding:10px 14px 6px}
@@ -78,11 +80,12 @@ button:disabled{opacity:.5;cursor:default}
   </div>
   <div>
     <ul class="how">
-      <li>Hold the pad for six minutes, until relief arrives.</li>
-      <li>Drag to walk. The gun aims itself. Dash to ram through.</li>
-      <li>A red lane on the ground is a lunge about to land.</li>
+      <li>Hold the pad for six minutes. Drag to walk; the gun aims itself.</li>
+      <li>Dash to ram through. Red on the ground is about to hurt.</li>
     </ul>
     <p class="tag" id="found"></p>
+    <p class="nightRow"><label for="night" class="sr">Night</label><select id="night"></select></p>
+    <p id="nightSay"></p>
     <button id="startBtn" class="go" data-autofocus>Start</button><br>
     <button id="setBtn1" class="alt">Settings &amp; accessibility</button>
   </div>
