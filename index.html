@@ -34,9 +34,14 @@ button:disabled{opacity:.5;cursor:default}
 :focus-visible{outline:3px solid #fff;outline-offset:3px}
 #stats{font-size:1.1rem;line-height:1.9;color:var(--dim);margin:8px 0 18px}
 #stats b{color:var(--amber);font-weight:600}
-#build{width:min(400px,100%);text-align:left;margin:6px 0 14px;color:var(--bone);font-size:.98rem;line-height:1.35}
-#build li{list-style:none;padding:8px 0;border-top:1px solid rgba(107,90,42,.5)}
-#build .rr{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.parts{width:min(400px,100%);text-align:left;margin:6px 0 14px;color:var(--bone);font-size:.98rem;line-height:1.35}
+.parts li{list-style:none;padding:8px 0;border-top:1px solid rgba(107,90,42,.5)}
+#part{background:rgba(0,0,0,.74)}
+#partI{position:static;transform:none;width:120px;height:120px;margin:4px 0 12px}
+#partD{font-size:1.25rem;line-height:1.4;max-width:330px;margin:4px 0 12px;color:#fff}
+#partR{font-weight:700}
+#partM{text-transform:none;letter-spacing:.02em;font-size:.92rem;margin-bottom:18px}
+.parts .rr{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 #found{letter-spacing:.06em;text-transform:none;font-size:.9rem;max-width:330px}
 #setBody{width:min(460px,100%);text-align:left;margin:10px 0 14px}
 #setBody fieldset{border:1px solid var(--line);margin:0 0 14px;padding:10px 14px 6px}
@@ -73,8 +78,8 @@ button:disabled{opacity:.5;cursor:default}
   </div>
   <div>
     <ul class="how">
-      <li>Drag to walk. The gun finds its own targets.</li>
-      <li>Dash to ram through them.</li>
+      <li>Hold the pad for six minutes, until relief arrives.</li>
+      <li>Drag to walk. The gun aims itself. Dash to ram through.</li>
       <li>A red lane on the ground is a lunge about to land.</li>
     </ul>
     <p class="tag" id="found"></p>
@@ -85,7 +90,7 @@ button:disabled{opacity:.5;cursor:default}
 
 <div class="scr top" id="pause" role="dialog" aria-modal="true" aria-labelledby="pauseT">
   <h2 id="pauseT">Paused</h2>
-  <ul id="build" aria-label="Fitted parts"></ul>
+  <ul id="build" class="parts" aria-label="Fitted parts"></ul>
   <button id="resumeBtn" class="go" data-autofocus>Resume</button>
   <button id="setBtn2" class="alt">Settings &amp; accessibility</button>
   <button id="quitBtn" class="alt">End run</button>
@@ -99,11 +104,21 @@ button:disabled{opacity:.5;cursor:default}
   <button id="setBack" class="go">Back</button>
 </div>
 
-<div class="scr" id="over" role="dialog" aria-modal="true" aria-labelledby="overT">
+<div class="scr top" id="over" role="dialog" aria-modal="true" aria-labelledby="overT">
   <h2 id="overT">Wrecked</h2>
   <div id="stats"></div>
+  <ul id="overParts" class="parts" aria-label="Parts fitted this run"></ul>
   <button id="againBtn" class="go" data-autofocus>Again</button>
   <button id="setBtn3" class="alt">Settings &amp; accessibility</button>
+</div>
+
+<div class="scr" id="part" role="dialog" aria-modal="true" aria-labelledby="partN" aria-describedby="partD">
+  <p class="tag" id="partR">Part fitted</p>
+  <canvas id="partI" width="192" height="192" aria-hidden="true"></canvas>
+  <h2 id="partN">Part</h2>
+  <p id="partD"></p>
+  <p id="partM" class="tag"></p>
+  <button id="partOk" class="go">Continue</button>
 </div>
 
 <div class="scr" id="nogl" role="alertdialog" aria-labelledby="noglT">

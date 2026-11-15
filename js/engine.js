@@ -129,7 +129,7 @@ void main() { float d = length(vU), a;
   if (vK < .5) a = smoothstep(1., .25, d);                                   // soft disc (contact shadow, splat)
   else if (vK < 1.5) a = smoothstep(1., .9, d) * smoothstep(.72, .84, d) + smoothstep(1., .0, d) * .25;   // ring with a faint fill
   else if (vK < 2.5) { vec2 q = abs(vU); a = smoothstep(1., .85, q.x) * smoothstep(1., .8, q.y); }          // soft rectangle (a lane)
-  else { float an = atan(vU.y, vU.x), r = .62 + .2 * sin(an * 3. + vS) + .13 * sin(an * 7. - vS * 2.) + .06 * sin(an * 13. + vS * 5.); a = smoothstep(r, r - .12, d); }   // a splat with ragged lobes
+  else { float an = atan(vU.y, vU.x), r = .7 + .11 * sin(an * 2. + vS) + .08 * sin(an * 5. - vS * 2.) + .04 * sin(an * 9. + vS * 5.); a = smoothstep(r, r - .2, d); }   // a splat with ragged lobes
   o = vec4(vC.rgb * a * vC.a, a * vC.a); }`;
 
 /* ---------- GL ---------- */
