@@ -13,6 +13,8 @@ Static site, no build step and no libraries: `index.html`, `js/engine.js` (a sma
 - **A red lane on the ground is a lunge about to land.** A bug rears up, the lane shows where it will go, and half a second later it leaps. Lunges are aimed at where you are heading, so change direction or dash across. Amber rings are your own mortar shells coming down.
 - **A red ring is acid about to land** (from night two). Spitters keep their distance and lob it at where you are heading; the pool stays for a few seconds.
 - Only a few bugs may attack at once. The rest circle and wait.
+- **Bugs climb out of burrows**: holes broken through the pad out in the dark, lit faintly from below, that flare when something is coming up. They stay where they opened, so you learn where the next ones will come from.
+- **The pad has landmarks**: dead walkers like yours, failing floodlights that sag and drop out, pillars, rubble and fire barrels.
 - **The number of bugs alive has a ceiling** that rises slowly (6 at the start, 20 by the third minute). A strong build gets more kills, not a fuller screen. Every 40 seconds runs press, swarm, lull.
 - **A brood guard** (large, with a plated back and a horned head it lowers to ram) arrives about every 55 seconds. It charges down a long wide lane, and it always drops a part and a repair cell.
 - Keyboard: WASD or arrows, Space or Shift to dash, P or Esc to pause, M to mute.
