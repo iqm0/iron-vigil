@@ -78,7 +78,7 @@ button:disabled{opacity:.45;cursor:default}
   <h1>Last<br>Light</h1>
   <div class="rule"></div>
   <ul class="how">
-    <li>Drag anywhere to walk. Your staff fires at whatever stands in the light.</li>
+    <li>Drag to walk. Let go to plant your feet and cast at whatever stands in the light.</li>
     <li>What waits in the dark is faster than you, and cannot be hit.</li>
     <li>Red ground is an attack about to land. Step off it, or dash.</li>
   </ul>
@@ -146,7 +146,7 @@ const COL = { bone: '#d9c9a3', gold: '#c9a45c', blood: '#b3261c' };
 /* ---------- assets ---------- */
 const A = window.ATLAS, IMG = {}; let READY = false;
 function loadAssets() { return Promise.all(Object.keys(A).map(k => new Promise((res, rej) => { const im = new Image(); im.onload = () => { IMG[k] = im; res(); }; im.onerror = rej; im.src = 'assets/' + A[k].img + '.webp'; }))); }
-const dirOf = a => { const sx = (Math.cos(a) - Math.sin(a)) * IX, sy = (Math.cos(a) + Math.sin(a)) * IY; return ((Math.round(Math.atan2(sy, sx) / (TAU / 8)) + 5) % 8 + 8) % 8; };   // FLARE order: SW W NW N NE E SE S
+const dirOf = a => ((Math.round(a / (TAU / 8)) + 5) % 8 + 8) % 8;   // FLARE numbers its eight facings by map direction (SW W NW N NE E SE S), so index from the world angle, not the screen angle
 function spr(set, anim, fr, dir, X, Y, sc, n) { const an = A[set].anims[anim], f = an.f[fr * (n || an.dirs || 8) + dir]; if (!f) return; sc = sc || 1; ctx.drawImage(IMG[set], f[0], f[1], f[2], f[3], X - f[4] * sc, Y - f[5] * sc, f[2] * sc, f[3] * sc); }
 function tile(key, i, X, Y) { const f = A.world.tiles[key][i]; ctx.drawImage(IMG.world, f[0], f[1], f[2], f[3], X - f[4], Y - f[5], f[2], f[3]); }
 function mkGlow(stops) { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), g = x.createRadialGradient(128, 128, 0, 128, 128, 128); for (const [o, col] of stops) g.addColorStop(o, col); x.fillStyle = g; x.fillRect(0, 0, 256, 256); return c; }
@@ -203,7 +203,7 @@ function startMusic() {
 const UPS = [
   { id: 'twin', kind: 'Staff', n: 'Forked Flame', max: 1, d: ['Loose two bolts side by side.'] },
   { id: 'slug', kind: 'Staff', n: 'Heavy Ember', max: 3, d: ['+35% bolt damage and a harder shove.'] },
-  { id: 'load', kind: 'Staff', n: 'Quick Hands', max: 3, d: ['Cast 22% faster.'] },
+  { id: 'load', kind: 'Staff', n: 'Quick Hands', max: 3, d: ['Each cast is 22% quicker.'] },
   { id: 'drill', kind: 'Staff', n: 'Lancing Fire', max: 2, d: ['Bolts pass through one more ant.'] },
   { id: 'burst', kind: 'Staff', n: 'Bursting Bolts', max: 2, d: ['Bolts burst where they land, scorching what stands close.', 'A wider, hotter burst.'] },
   { id: 'bright', kind: 'Light', n: 'Brighter Flame', max: 3, d: ['Your light reaches 18% further.'] },
@@ -218,15 +218,15 @@ const NEED = l => Math.round(10 + 8 * l + 1.2 * l * l), DAWN = 360;
 /* ---------- state ---------- */
 let state = 'title', G = null, lastT = 0, stick = null, dbtn = null; const keys = {};
 function newGame(demo) {
-  G = { demo, t: demo ? 40 : 0, x: 40, y: 40, vx: 0, vy: 0, hp: 100, maxhp: 100, inv: 0, hurt: 0, face: .8, walk: 0, castT: 0, fireAcc: 0, dead: 0,
+  G = { demo, t: demo ? 40 : 0, x: 40, y: 40, vx: 0, vy: 0, hp: 100, maxhp: 100, inv: 0, hurt: 0, face: .8, walk: 0, cast: null, dead: 0,
     dash: null, dashCd: 0, ghosts: [], en: [], bl: [], globs: [], fx: [], corpses: [], gems: [], pops: [],
     level: 1, xp: 0, need: NEED(1), pend: 0, up: {}, kills: 0, id: 1, spawnAcc: 0, spitT: 6, bruteT: 4, surgeI: 0, novaT: 4, scorchT: 0,
-    shake: 0, freeze: 0, cap: null, won: false, hint: 7, S: null, seen: {}, dawn: 0, stepT: 0, lightR: 290 };
+    shake: 0, freeze: 0, cap: null, won: false, hint: 7, S: null, seen: {}, dawn: 0, stepT: 0, lightR: 290, frenzy: 1 };
   recalc(); return G;
 }
 function recalc() {
   const g = G, u = id => g.up[id] || 0, old = g.maxhp;
-  g.S = { dmg: 20 * (1 + .35 * u('slug')), kb: 1 + .5 * u('slug'), rate: 2.9 * (1 + .22 * u('load')), pierce: u('drill'), twin: u('twin') > 0, burst: [0, 62, 88][u('burst')],
+  g.S = { dmg: 34 * (1 + .35 * u('slug')), kb: 1 + .5 * u('slug'), rate: 3.1 * (1 + .22 * u('load')), pierce: u('drill'), twin: u('twin') > 0, burst: [0, 62, 88][u('burst')],
     light: 290 * (1 + .18 * u('bright')), scorch: [0, 8, 16][u('scorch')], novaCd: [0, 8, 6, 4.5][u('nova')], novaDmg: u('nova') >= 3 ? 60 : 40,
     dashCd: 2.6 * (1 - .3 * Math.min(1, u('dash'))), shove: u('dash') >= 2, mag: 90 * (1 + u('magnet')), spd: 165 };
   g.maxhp = 100 + 25 * u('plate'); if (g.maxhp > old) g.hp = Math.min(g.maxhp, g.hp + (g.maxhp - old));
@@ -256,13 +256,13 @@ function pushOut(o, rad) { const cx = Math.floor(o.x / (CS * TILE)), cy = Math.f
 
 /* ---------- ants ---------- */
 const BUG = {
-  skitter: { set: 'ant', sc: 1, hp: 30, spd: 188, r: 15, xp: 1 },
+  skitter: { set: 'ant', sc: 1, hp: 26, spd: 188, r: 15, xp: 1 },
   spitter: { set: 'fireant', sc: .82, hp: 60, spd: 74, r: 24, xp: 3 },
   brute: { set: 'antlion', sc: 1.3, hp: 540, spd: 50, r: 36, xp: 12 },
 };
 function spawnDist() { return Math.hypot(W / Z / IX, H / Z / IY) * .36 + 80; }
 function spawn(type, x, y) {
-  const g = G, B = BUG[type], k = 1 + g.t / 170;
+  const g = G, B = BUG[type], k = 1 + g.t / 220;
   const e = { t: type, id: g.id++, x, y, kx: 0, ky: 0, r: B.r, hp: B.hp * k, maxhp: B.hp * k, spd: B.spd * rand(.94, 1.06), h: Math.atan2(g.y - y, g.x - x), ph: rand(0, 6), state: 'go', st: 0, cd: rand(.5, 1.6), flash: 0, lit: 0, burnT: 0, ax: 0, ay: 0, hitP: false };
   g.en.push(e); return e;
 }
@@ -305,18 +305,18 @@ function startDash(wx, wy) {
 function update(dt) {
   const g = G, S = g.S; g.t += dt;
   if (g.cap) { g.cap.t -= dt; if (g.cap.t <= 0) g.cap = null; } if (g.hint > 0) g.hint -= dt;
-  g.inv = Math.max(0, g.inv - dt); g.hurt = Math.max(0, g.hurt - dt); g.castT = Math.max(0, g.castT - dt); g.shake = Math.max(0, g.shake - dt * 30); if (g.dashCd > 0) g.dashCd -= dt;
+  g.inv = Math.max(0, g.inv - dt); g.hurt = Math.max(0, g.hurt - dt); g.shake = Math.max(0, g.shake - dt * 30); if (g.dashCd > 0) g.dashCd -= dt;
   const dawn = clamp((g.t - (DAWN - 28)) / 28, 0, 1); g.dawn = dawn; g.lightR = S.light + dawn * dawn * 1600;
   if (g.dead) { g.dead += dt; if (g.dead > 1.6 && state === 'play') endGame(false); }
 
   // --- movement
   let ix = 0, iy = 0; if (keys.w || keys.arrowup) iy -= 1; if (keys.s || keys.arrowdown) iy += 1; if (keys.a || keys.arrowleft) ix -= 1; if (keys.d || keys.arrowright) ix += 1; if (stick) { ix = stick.dx; iy = stick.dy; }
-  if (g.demo) { ix = Math.cos(g.t * .31); iy = Math.sin(g.t * .43); } if (g.dead) ix = iy = 0;
+  if (g.demo) { if (g.t % 5 < 2.4) { ix = Math.cos(g.t * .31); iy = Math.sin(g.t * .43); } } if (g.dead) ix = iy = 0;
   let wx = ix / IX + iy / IY, wy = iy / IY - ix / IX; const wl = Math.hypot(wx, wy), moving = wl > .01; if (moving) { wx /= wl; wy /= wl; }
   if (g.dash) { const D = g.dash; D.t += dt; g.vx = D.dx * 720; g.vy = D.dy * 720; if (g.ghosts.length < 5 && D.t > g.ghosts.length * .035) g.ghosts.push({ x: g.x, y: g.y, t: .25, d: dirOf(g.face), f: Math.floor(g.walk / 24) % 8 });
     if (S.shove) for (const e of g.en) if (!e.dead && !D.hit.has(e.id) && Math.hypot(e.x - g.x, e.y - g.y) < e.r + 30) { D.hit.add(e.id); const l = Math.hypot(e.x - g.x, e.y - g.y) || 1; hurtEnemy(e, 26, (e.x - g.x) / l, (e.y - g.y) / l, 420); addFx('spark', e.x, e.y, 1, 30); }
     if (D.t >= .18) { g.dash = null; g.vx = D.dx * S.spd; g.vy = D.dy * S.spd; } }
-  else { const sp = moving ? S.spd * (g.demo ? .5 : 1) : 0, tx = wx * sp, ty = wy * sp, acc = (moving ? 1500 : 2200) * dt, dvx = tx - g.vx, dvy = ty - g.vy, dl = Math.hypot(dvx, dvy); if (dl <= acc) { g.vx = tx; g.vy = ty; } else { g.vx += dvx / dl * acc; g.vy += dvy / dl * acc; } }
+  else { const sp = moving ? S.spd * (g.demo ? .6 : 1) : 0, tx = wx * sp, ty = wy * sp, acc = (moving ? 1500 : 2200) * dt, dvx = tx - g.vx, dvy = ty - g.vy, dl = Math.hypot(dvx, dvy); if (dl <= acc) { g.vx = tx; g.vy = ty; } else { g.vx += dvx / dl * acc; g.vy += dvy / dl * acc; } }
   g.x += g.vx * dt; g.y += g.vy * dt; pushOut(g, 13); const spd = Math.hypot(g.vx, g.vy); g.moving = spd > 25; g.walk += spd * dt;
   if (g.moving && !g.demo) { g.stepT -= dt * spd / 165; if (g.stepT <= 0) { g.stepT = .3; sfx.step(); } }
   for (const q of g.ghosts) q.t -= dt; g.ghosts = g.ghosts.filter(q => q.t > 0);
@@ -327,16 +327,18 @@ function update(dt) {
     for (let i = c0x; i <= c1x; i++) for (let j = c0y; j <= c1y; j++) for (const p of getCell(i, j)) if (p.k === 'brazier') LIGHTS.push({ x: p.x, y: p.y, r: 215, s: p.s }); }
 
   // --- ants
-  spawnLogic(dt);
+  g.frenzy = 1 + Math.min(.28, Math.max(0, g.en.length - 10) * .012); spawnLogic(dt);
   for (const e of g.en) updBug(e, dt);
   for (let i = 0; i < g.en.length; i++) { const a = g.en[i]; if (a.dead) continue; for (let j = i + 1; j < g.en.length; j++) { const b = g.en[j]; if (b.dead) continue; const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r, d2 = dx * dx + dy * dy; if (d2 < rr * rr && d2 > .01) { const d = Math.sqrt(d2), p = (rr - d) / d * .5, wa = a.t === 'brute' ? .15 : 1, wb = b.t === 'brute' ? .15 : 1; a.x -= dx * p * wa; a.y -= dy * p * wa; b.x += dx * p * wb; b.y += dy * p * wb; } } }
 
-  // --- the staff: nearest ant the light touches
+  // --- the staff: you cast only while standing. Plant your feet, turn to the nearest ant in the light, and loose a bolt at the top of the swing.
   let shot = null, sb = 700;
   if (!g.dead) for (const e of g.en) { if (e.dead || e.lit < 1) continue; const d = Math.hypot(e.x - g.x, e.y - g.y) - (e.t === 'brute' && e.state === 'stun' ? 120 : 0); if (d < sb) { sb = d; shot = e; } }
   g.target = shot;
-  if (shot) { g.fireAcc += dt * S.rate; while (g.fireAcc >= 1) { g.fireAcc -= 1; fire(shot); } } else g.fireAcc = Math.min(g.fireAcc, .8);
-  if (g.moving) g.face += angDiff(g.face, Math.atan2(g.vy, g.vx)) * Math.min(1, dt * 14); else if (shot) g.face += angDiff(g.face, Math.atan2(shot.y - g.y, shot.x - g.x)) * Math.min(1, dt * 14);
+  if (g.moving || g.dash || g.dead) { g.cast = null; if (g.moving) g.face += angDiff(g.face, Math.atan2(g.vy, g.vx)) * Math.min(1, dt * 16); }
+  else if (g.cast) { const c = g.cast; c.t += dt; if (shot && !c.fired) { c.a = Math.atan2(shot.y - g.y, shot.x - g.x); g.face = c.a; }
+    if (!c.fired && c.t >= c.dur * .5) { c.fired = true; fire(c.a); } if (c.t >= c.dur) g.cast = null; }
+  else if (shot) { const a = Math.atan2(shot.y - g.y, shot.x - g.x); g.face = a; g.cast = { t: 0, dur: 1 / S.rate, a, fired: false }; }
   if (S.scorch && !g.dead) { g.scorchT -= dt; if (g.scorchT <= 0) { g.scorchT = .25; for (const e of g.en) { if (e.dead) continue; if (Math.hypot(e.x - g.x, e.y - g.y) < S.light * .55) { e.burnT = .3; hurtEnemy(e, S.scorch * .25, 0, 0, 0, true); } } } }
   if (S.novaCd && !g.demo && !g.dead) { g.novaT -= dt; if (g.novaT <= 0 && g.en.some(e => Math.hypot(e.x - g.x, e.y - g.y) < 170)) { g.novaT = S.novaCd; blastAt(g.x, g.y, 165, S.novaDmg, 380); sfx.boom(); g.shake = Math.max(g.shake, 4); } }
 
@@ -358,20 +360,20 @@ function update(dt) {
   camX += ((g.x - g.y) * IX + (g.vx - g.vy) * IX * .12 - camX) * Math.min(1, dt * 7); camY += ((g.x + g.y) * IY + (g.vx + g.vy) * IY * .12 - camY) * Math.min(1, dt * 7);
   if (!g.demo && !g.dead) { if (g.pend > 0 && state === 'play') openLevelUp(); if (!g.won && g.t >= DAWN) { g.won = true; endGame(true); } }
 }
-function fire(tg) {
-  const g = G, S = g.S, a = Math.atan2(tg.y - g.y, tg.x - g.x), ca = Math.cos(a), sa = Math.sin(a);
-  for (const o of S.twin ? [-9, 9] : [0]) g.bl.push({ x: g.x + ca * 22 - sa * o, y: g.y + sa * 22 + ca * o, vx: ca * 640, vy: sa * 640, dmg: S.dmg, life: .8, pierce: S.pierce, hit: [], a, ph: Math.random() * 4 });
-  g.castT = .3; if (!g.demo) sfx.shot();
+function fire(a) {
+  const g = G, S = g.S, ca = Math.cos(a), sa = Math.sin(a);
+  for (const o of S.twin ? [-10, 10] : [0]) g.bl.push({ x: g.x + ca * 34 - sa * o, y: g.y + sa * 34 + ca * o, vx: ca * 640, vy: sa * 640, dmg: S.dmg, life: .8, pierce: S.pierce, hit: [], a, ph: Math.random() * 4 });
+  if (!g.demo) sfx.shot();
 }
 function updBug(e, dt) {
   const g = G, dx = g.x - e.x, dy = g.y - e.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, T = e.t, calm = g.demo || g.dead;
   e.lit = lightAt(e.x, e.y); e.flash = Math.max(0, e.flash - dt); e.burnT = Math.max(0, e.burnT - dt); e.cd -= dt; e.st += dt;
-  let mx = 0, my = 0, sp = e.spd * ST.espd * (e.lit === 2 ? .62 : e.lit === 1 ? .8 : 1);   // they shy from the light
+  let mx = 0, my = 0, sp = e.spd * ST.espd * (e.lit === 2 ? .62 : e.lit === 1 ? .8 : 1) * g.frenzy;   // they shy from the light, and a big swarm works itself into a frenzy
   if (T === 'skitter') {
-    if (e.state === 'go') { const w = Math.sin(e.ph * .05 + e.id) * .45; mx = ux - uy * w; my = uy + ux * w; if (d < 96 && e.cd <= 0 && !calm) { e.state = 'wind'; e.st = 0; e.ax = ux; e.ay = uy; sfx.tell(); } else if (calm && d < 90) { mx = -ux; my = -uy; } }
+    if (e.state === 'go') { const w = Math.sin(e.ph * .05 + e.id) * .45; mx = ux - uy * w; my = uy + ux * w; if (d < 96 && e.cd <= 0 && !calm) { e.state = 'wind'; e.st = 0; const lx_ = g.x + g.vx * .3 - e.x, ly_ = g.y + g.vy * .3 - e.y, ll = Math.hypot(lx_, ly_) || 1; e.ax = lx_ / ll; e.ay = ly_ / ll; sfx.tell(); } else if (calm && d < 90) { mx = -ux; my = -uy; } }
     else if (e.state === 'wind') { sp = 0; if (e.st >= .36) { e.state = 'lunge'; e.st = 0; e.hitP = false; } }
-    else if (e.state === 'lunge') { mx = e.ax; my = e.ay; sp = 620; if (!e.hitP && d < e.r + 20) { e.hitP = true; hurtPlayer(10, e.x, e.y); } if (e.st >= .26) { e.state = 'rest'; e.st = 0; } }
-    else { sp = 0; if (e.st >= .5) { e.state = 'go'; e.cd = rand(.7, 1.4); } }
+    else if (e.state === 'lunge') { mx = e.ax; my = e.ay; sp = 620; if (!e.hitP && d < e.r + 20) { e.hitP = true; hurtPlayer(8, e.x, e.y); } if (e.st >= .3) { e.state = 'rest'; e.st = 0; } }
+    else { sp = 0; if (e.st >= .6) { e.state = 'go'; e.cd = rand(1.1, 1.9); } }
   } else if (T === 'spitter') {
     if (e.state === 'go') { if (d > 330) { mx = ux; my = uy; } else if (d < 210) { mx = -ux; my = -uy; } else { const s = e.id & 1 ? 1 : -1; mx = -uy * s; my = ux * s; sp *= .6; }
       if (e.cd <= 0 && d < 420 && !calm) { e.state = 'aim'; e.st = 0; e.ax = g.x + g.vx * .55; e.ay = g.y + g.vy * .55; sfx.tell(); } }
@@ -422,7 +424,7 @@ function render() {
   for (const c of g.corpses) { const an = A[c.set].anims.die, f = Math.min(an.n - 1, Math.floor(c.t / (an.dur / 1000) * an.n)); ctx.globalAlpha = clamp((9 - c.t) / 2, 0, 1); spr(c.set, 'die', f, c.dir, SX(c.x, c.y), SY(c.x, c.y), c.sc); } ctx.globalAlpha = 1;
   // --- attack marks
   for (const e of g.en) { const X = SX(e.x, e.y), Y = SY(e.x, e.y);
-    if (e.t === 'skitter' && e.state === 'wind') mark(() => gp(X, Y, Math.atan2(e.ay, e.ax), () => ctx.rect(6, -13, 160, 26)), e.st / .36);
+    if (e.t === 'skitter' && e.state === 'wind') mark(() => gp(X, Y, Math.atan2(e.ay, e.ax), () => ctx.rect(6, -13, 186, 26)), e.st / .36);
     else if (e.t === 'brute' && e.state === 'aim') mark(() => gp(X, Y, Math.atan2(e.ay, e.ax), () => ctx.rect(20, -36, 440, 72)), e.st / .9);
     else if (e.t === 'spitter' && e.state === 'aim') mark(() => gp(SX(e.ax, e.ay), SY(e.ax, e.ay), 0, () => ctx.arc(0, 0, 46, 0, TAU)), e.st / .6 * .5); }
   for (const q of g.globs) { const u = q.t / q.T; mark(() => gp(SX(q.tx, q.ty), SY(q.tx, q.ty), 0, () => ctx.arc(0, 0, q.r, 0, TAU)), .5 + u * .5); }
@@ -436,7 +438,7 @@ function render() {
     else if (o._k === 'e') { const B = BUG[o.t], [a, f] = bugFrame(o); spr(B.set, a, f, dirOf(o.h), X, Y, B.sc);
       if (o.t === 'brute' && o.hp < o.maxhp && o.lit) { ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(X - 37, Y - 132, 74, 9); ctx.fillStyle = o.state === 'stun' ? '#e8d9a8' : COL.blood; ctx.fillRect(X - 35, Y - 130, 70 * clamp(o.hp / o.maxhp, 0, 1), 5); } }
     else if (o._k === 'g') { ctx.globalAlpha = o.t / .25 * .4; spr('hero', 'run', o.f, o.d, X, Y); ctx.globalAlpha = 1; }
-    else { let a = 'stance', f = [0, 1, 2, 3, 2, 1][Math.floor(t * 5) % 6]; if (g.dead) { a = 'die'; f = Math.min(5, Math.floor(g.dead / .13)); } else if (g.hurt > .28) { a = 'hit'; f = 1; } else if (g.moving || g.dash) { a = 'run'; f = Math.floor(g.walk / 24) % 8; } else if (g.castT > 0) { a = 'cast'; f = Math.min(3, Math.floor((.3 - g.castT) / .075)); }
+    else { let a = 'stance', f = [0, 1, 2, 3, 2, 1][Math.floor(t * 5) % 6]; if (g.dead) { a = 'die'; f = Math.min(5, Math.floor(g.dead / .13)); } else if (g.hurt > .28) { a = 'hit'; f = 1; } else if (g.moving || g.dash) { a = 'run'; f = Math.floor(g.walk / 24) % 8; } else if (g.cast) { a = 'cast'; f = Math.min(3, Math.floor(g.cast.t / g.cast.dur * 4)); }
       if (g.inv > 0 && !g.dash && !g.dead && !ST.flash && Math.floor(t * 16) % 2) ctx.globalAlpha = .6; spr('hero', a, f, dirOf(g.face), X, Y); ctx.globalAlpha = 1; } }
   // --- darkness, with holes where there is light
   const ls = RS * .5, amb = (1 - g.dawn) * (.8 - .4 * ST.bright - (ST.contrast ? .12 : 0)), EA = Math.SQRT2 * IX, EB = Math.SQRT2 * IY, fl = Math.floor(t * 11);
@@ -452,7 +454,7 @@ function render() {
   const wash = (x, y, r, a) => { ctx.globalAlpha = a; ctx.drawImage(WARM, SX(x, y) - r * EA, SY(x, y) - r * EB - 20, r * 2 * EA, r * 2 * EB); };
   wash(g.x, g.y, g.lightR * .75, .2 * (1 - g.dawn)); for (const L of LIGHTS) wash(L.x, L.y, L.r * .8, .5); for (const b of g.bl) wash(b.x, b.y, 55, .5);
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  for (const b of g.bl) spr('fx', 'bolt', Math.floor(t * 15 + b.ph) % 4, dirOf(b.a), SX(b.x, b.y), SY(b.x, b.y) - 38, .8);
+  for (const b of g.bl) spr('fx', 'bolt', Math.floor(t * 15 + b.ph) % 4, dirOf(b.a), SX(b.x, b.y), SY(b.x, b.y) - 46, .9);
   for (const q of g.globs) spr('fx', 'spit', Math.floor(t * 20) % 8, dirOf(q.a), SX(q.x, q.y), SY(q.x, q.y) - q.z + 60, .9);
   for (const f of g.fx) { const an = A.fx.anims[f.k]; spr('fx', f.k, Math.min(an.n - 1, Math.floor(f.t / (an.dur / 1000) * an.n)), 0, SX(f.x, f.y), SY(f.x, f.y) - f.z, f.sc, 1); }
   for (const e of g.en) if (e.burnT > 0) spr('fx', 'spark', Math.floor(t * 12 + e.id) % 4, 0, SX(e.x, e.y), SY(e.x, e.y) - 24, .8, 1);
@@ -481,7 +483,7 @@ function hud(t) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.strokeStyle = COL.gold; ctx.lineWidth = hc ? 3 : 2; ctx.stroke(); if (ST.nums || hc) { ctx.font = F(14); txt(`${Math.ceil(g.hp)}`, x, y + 5 * TS, '#fff', 'center'); } }
   const ry = top + 14 + 20 * TS + 14;
   if (g.cap) { const a = clamp(g.cap.t * 3, 0, 1); ctx.globalAlpha = a; ctx.font = 'italic ' + F(15); const tw = Math.min(W - 20, ctx.measureText(g.cap.txt).width + 28); ctx.fillStyle = 'rgba(0,0,0,.78)'; ctx.fillRect((W - tw) / 2, ry, tw, 28 * TS); ctx.textAlign = 'center'; ctx.fillStyle = '#eadcb4'; ctx.fillText(g.cap.txt, W / 2, ry + 19 * TS, W - 36); ctx.globalAlpha = 1; }
-  if (g.hint > 0 && !stick) { ctx.globalAlpha = clamp(g.hint, 0, 1); ctx.font = 'italic ' + F(16); txt('drag anywhere to walk', W / 2, H * .68, COL.bone, 'center'); ctx.globalAlpha = 1; }
+  if (g.hint > 0 && !stick) { ctx.globalAlpha = clamp(g.hint, 0, 1); ctx.font = 'italic ' + F(16); txt('drag to walk · let go to cast', W / 2, H * .68, COL.bone, 'center'); ctx.globalAlpha = 1; }
   if (ST.arrows) for (const e of g.en) { if (e.t === 'skitter') continue; const X = SX(e.x, e.y) * Z + OX, Y = SY(e.x, e.y) * Z + OY; if (X > 10 && X < W - 10 && Y > top + 60 && Y < H - 10) continue;
     const cx = W / 2, cy = H / 2, dx = X - cx, dy = Y - cy, k = Math.min((W / 2 - 22) / (Math.abs(dx) || 1), (H / 2 - 70) / (Math.abs(dy) || 1)), ax = cx + dx * k, ay = cy + dy * k, a = Math.atan2(dy, dx), s = (e.t === 'brute' ? 14 : 10) * TS;
     ctx.save(); ctx.translate(ax, ay); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * .6, -s * .8); ctx.lineTo(-s * .6, s * .8); ctx.closePath(); ctx.fillStyle = e.t === 'brute' ? '#d03a22' : '#d9b060'; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore(); }

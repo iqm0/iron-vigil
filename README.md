@@ -17,16 +17,17 @@ Two earlier versions are kept for reference: the first prototype under [`legacy/
 ## How it plays
 
 - **Drag anywhere** to walk. **Dash** with the button (drag it to aim, or tap). Keyboard: WASD or arrows, Space or Shift to dash, P to pause.
-- The staff fires by itself at the nearest ant inside the light. Ants in the light are slowed. Ants in the dark outrun you.
+- **Let go to cast.** While you stand still the hero turns to the nearest ant inside the light and casts fire bolts. While you run, you do not cast. Ants in the light are slowed. Ants in the dark outrun you.
 - **Red ground with a dashed edge is an attack about to land.** Step off it or dash through.
 - Kills drop gold. Enough gold gives a choice of three boons. Each boon also mends a little life.
+- The more ants are alive, the faster the whole swarm moves. Running without killing gets you run down.
 - In the last half minute the light spreads outward. That is dawn.
 
 ## Ants
 
 | Ant | What it does |
 |---|---|
-| **Ant** (small, green) | Rushes you, crouches, then lunges along a marked lane. It stands still before and after |
+| **Ant** (small, green) | Rushes you, crouches, then lunges along a marked lane aimed at where you are heading. It stands still before and after |
 | **Fire ant** (orange) | Hangs back and spits acid at where you are heading. The landing spot is marked |
 | **Antlion** (large, dark) | Charges down a long marked lane, trampling its own swarm. It reels afterwards and takes double damage |
 
