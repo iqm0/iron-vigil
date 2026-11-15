@@ -55,7 +55,7 @@ const sfx = {
   lunge() { noise(.16, .12, 2200, 'bandpass', 0, -1700); },
   ready() { tone(660, .07, 'triangle', .05); tone(990, .09, 'triangle', .05, 0, AC && AC.currentTime + .06); },
   swarm() { tone(210, .5, 'sawtooth', .05, 160); noise(.5, .08, 2400, 'bandpass', 0, 1200); },
-  item(r) { const b = r === 'e' ? 523 : r === 'r' ? 440 : 392, n = r === 'e' ? 4 : r === 'r' ? 3 : 2; for (let i = 0; i < n; i++) tone(b * [1, 1.25, 1.5, 2][i], .22, 'triangle', .09, 0, AC && AC.currentTime + i * .08); buzz(25); },
+  item(r) { if (r === 'l') { [262, 392, 523, 659, 784, 1047].forEach((f, i) => tone(f, .5, 'triangle', .1, 0, AC && AC.currentTime + i * .09)); tone(65, .9, 'sine', .3, -10); buzz(60); return; } const b = r === 'e' ? 523 : r === 'r' ? 440 : 392, n = r === 'e' ? 4 : r === 'r' ? 3 : 2; for (let i = 0; i < n; i++) tone(b * [1, 1.25, 1.5, 2][i], .22, 'triangle', .09, 0, AC && AC.currentTime + i * .08); buzz(25); },
   repair() { tone(520, .1, 'sine', .08, 260); tone(780, .14, 'sine', .06, 0, AC && AC.currentTime + .08); },
   spit() { noise(.2, .12, 900, 'bandpass', 0, 900); tone(210, .2, 'sine', .07, 260); },
   splat() { noise(.25, .2, 600, 'lowpass', 0, -350); },
@@ -80,12 +80,12 @@ const HIP = 1.5, HIPW = .56, L1 = .98, L2 = 1.02, REACH = 1.93, STRIDE = 3.1, SW
 const DASH = { wind: .045, burst: .2, rec: .3, v: 31 };
 const BUGV = 4.5, TELL = .5, LUNGE_T = .3, LUNGE_V = 17, LANE = LUNGE_T * LUNGE_V + .8, PACE = .9, RUN = 360 * PACE;      // the whole game runs at nine tenths speed; RUN is in game seconds, so a run lasts six real minutes
 const YEL = [.78, .47, .05], YEL2 = [.5, .3, .04], DRK = [.055, .06, .07], STL = [.24, .25, .28], RUST = [.24, .1, .045], CONC = [.3, .29, .27], BRASS = [.8, .55, .15];
-const SPITC = [.12, .13, .05], SPITC2 = [.3, .32, .1], CHIT = [.05, .032, .03], CHIT2 = [.26, .085, .03], BONE = [.6, .52, .4], ICH = [.32, .75, .08];
+const CHITM = [.12, .042, .022], GROW = [0, 2, 4, 7, 10, 13, 17], FLESH = [.32, .07, .06], ALLYC = [.03, .07, .1], ALLYC2 = [.06, .26, .36], SPITC = [.12, .13, .05], SPITC2 = [.3, .32, .1], CHIT = [.05, .032, .03], CHIT2 = [.26, .085, .03], BONE = [.6, .52, .4], ICH = [.32, .75, .08];
 
 /* ---------- parts: the mech starts bare; bugs drop parts and they bolt themselves on ----------
    Rarity is the part's role: common parts tune what you have, rare parts are new weapons, epic parts change a rule.
    Finding a part again raises its mark. Every part is something you can see happen on screen. */
-const RAR = { c: { n: 'Common', col: [.8, .84, .86], css: '#d5dde0', w: 46 }, r: { n: 'Rare', col: [.25, .6, 1], css: '#6db4ff', w: 40 }, e: { n: 'Epic', col: [1, .5, .08], css: '#ffb347', w: 14 } };
+const RAR = { c: { n: 'Common', col: [.8, .84, .86], css: '#d5dde0', w: 46 }, r: { n: 'Rare', col: [.25, .6, 1], css: '#6db4ff', w: 40 }, e: { n: 'Epic', col: [.7, .4, 1], css: '#c79bff', w: 14 }, l: { n: 'Legendary', col: [1, .72, .15], css: '#ffcf4a', w: 3 } };
 const ITEMS = [
   { id: 'hot', n: 'Hot Loads', r: 'c', max: 3, d: l => `Everything you fire hits ${35 * l}% harder.`, f: (s, l) => { s.dmg *= 1 + .35 * l; } },
   { id: 'belt', n: 'Belt Feeder', r: 'c', max: 3, d: l => `The gun fires ${30 * l}% faster.`, f: (s, l) => { s.rate *= 1 + .3 * l; } },
@@ -100,24 +100,30 @@ const ITEMS = [
   { id: 'boom', n: 'Breaching Rounds', r: 'e', max: 2, d: l => `Every ${l === 1 ? 'fourth' : 'second'} shot explodes.`, f: (s, l) => { s.boom = l === 1 ? 4 : 2; } },
   { id: 'ichor', n: 'Volatile Ichor', r: 'e', max: 2, d: l => l === 1 ? 'Bugs burst when they die and hurt their neighbours.' : 'Bugs burst wider and harder when they die.', f: (s, l) => { s.ichor = l; } },
   { id: 'chain', n: 'Ram Charger', r: 'e', max: 2, d: l => l === 1 ? 'The dash goes half as far again, and every ram kill recharges it.' : 'The dash also ends in a slam that blasts everything around you.', f: (s, l) => { s.chain = l; } },
+  /* legendary parts are organs, not hardware. Each changes how a run plays, and none can be raised */
+  { id: 'heart', n: 'Brood Heart', r: 'l', max: 1, d: () => 'Some of the bugs you kill rise again and fight for you for a while. Yours glow blue.', f: s => { s.heart = 1; } },
+  { id: 'stride', n: 'Titan Tendons', r: 'l', max: 1, d: () => 'Every footfall cracks the ground and hurts everything near that foot.', f: s => { s.stride = 1; } },
+  { id: 'reaper', n: 'Reaper Limbs', r: 'l', max: 1, d: () => 'Two bone scythes grow from your back and sweep around you without stopping.', f: s => { s.reaper = 1; } },
+  { id: 'molt', n: 'Second Shell', r: 'l', max: 1, d: () => 'Once a night, the hit that would wreck you sheds the shell instead: a blast, and half your hull back.', f: s => { s.molt = 1; } },
+  { id: 'graft', n: 'Spitter Graft', r: 'l', max: 1, d: () => 'A grown limb spits acid at a second target, and every hit splashes.', f: s => { s.graft = 1; } },
   { id: 'sear', n: 'Searing Lamp', r: 'e', max: 2, d: l => l === 1 ? 'A wider lamp that burns and slows every bug in its beam.' : 'The lamp burns twice as hot.', f: (s, l) => { s.sear = l; } },
 ];
 const ITEM = {}; for (const it of ITEMS) ITEM[it.id] = it; const MK = ['', 'Mark I', 'Mark II', 'Mark III'];
 let FOUND = []; try { const o = JSON.parse(localStorage.getItem('ll4_found')); if (Array.isArray(o)) FOUND = o.filter(id => ITEM[id]); } catch (e) { }
-const baseStats = () => ({ dmg: 12, rate: 9.5, range: 16, speed: 6.4, dashCd: 1.5, maxhp: 100, ramDmg: 110, pierce: 0, spread: .035, magnet: 5, leech: 0, mortar: 0, coil: 0, drone: 0, burn: 0, shock: 0, boom: 0, ichor: 0, chain: 0, sear: 0 });
+const baseStats = () => ({ dmg: 12, rate: 9.5, range: 16, speed: 6.4, dashCd: 1.5, maxhp: 100, ramDmg: 110, pierce: 0, spread: .035, magnet: 5, leech: 0, mortar: 0, coil: 0, drone: 0, burn: 0, shock: 0, boom: 0, ichor: 0, chain: 0, sear: 0, heart: 0, stride: 0, reaper: 0, molt: 0, graft: 0 });
 function recalc(g) { const s = baseStats(); for (const id of g.items) ITEM[id].f(s, g.lv[id]); g.s = s; }
 const cardQ = []; let cardAt = 0;
 function equip(id, how) { const g = G, it = ITEM[id], first = !g.lv[id]; if (g.lv[id] >= it.max) { g.hp = Math.min(g.s.maxhp, g.hp + 15); sfx.repair(); return; }      // already at its top mark: it is scrap, and scrap mends the hull
-  if (first) { g.items.push(id); g.lv[id] = 1; } else g.lv[id]++; const l = g.lv[id]; recalc(g); g.itemFx = 1; g.itemCol = RAR[it.r].col; g.parts++;
+  if (first) { g.items.push(id); g.lv[id] = 1; } else g.lv[id]++; const l = g.lv[id]; recalc(g); g.itemFx = 1; g.itemCol = RAR[it.r].col; g.parts++; g.fitT[id] = g.t;
   let fresh = false; if (!FOUND.includes(id)) { FOUND.push(id); fresh = true; try { localStorage.setItem('ll4_found', JSON.stringify(FOUND)); } catch (e) { } g.fresh.push(id); }
   sfx.item(it.r); const line = it.n + (it.max > 1 ? ', ' + MK[l] : '') + '. ' + it.d(l);
   if (first && !how && ST.cards) { cardQ.push({ id, l, fresh }); if (state === 'play') openCard(); } else cap((how ? how + ': ' : '') + line, 4.5); }     // a part you have not had this run stops the game so you can read it; a higher mark is a caption
 function openCard() { const c = cardQ[0]; if (!c) return; const it = ITEM[c.id], R = RAR[it.r]; state = 'card'; stick = null; dbtn = null; cardAt = performance.now();
-  $('partR').textContent = R.n + ' part fitted' + (c.fresh ? ' · new' : ''); $('partR').style.color = R.css; $('partN').textContent = it.n; $('partD').textContent = it.d(c.l); $('partM').textContent = it.max > 1 ? `${MK[c.l]} of ${it.max}. Find it again to raise it.` : '';
+  $('partR').textContent = R.n + ' part fitted' + (c.fresh ? ' · new' : ''); $('partR').style.color = R.css; $('partN').textContent = it.n; $('partD').textContent = it.d(c.l); $('partM').textContent = it.max > 1 ? `${MK[c.l]} of ${it.max}. Find it again to raise it.` : 'Legendary parts cannot be raised.';
   const x = $('partI').getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, 192, 192); x.fillStyle = 'rgba(0,0,0,.55)'; x.beginPath(); x.arc(96, 96, 92, 0, TAU); x.fill(); x.strokeStyle = R.css; x.lineWidth = 5; x.stroke(); icon(x, c.id, 96, 96, 54, R.css);
   const b = $('partOk'); b.disabled = true; setTimeout(() => { b.disabled = false; if (state === 'card') try { b.focus({ preventScroll: true }); } catch (e) { } }, 450); show('part'); announce(`${R.n} part fitted: ${it.n}. ${it.d(c.l)}`); }
 function closeCard() { if (state !== 'card' || performance.now() - cardAt < 400) return; cardQ.shift(); if (cardQ.length) openCard(); else { state = 'play'; show(''); lastT = performance.now(); } }
-function rollItem(g) { const pool = ITEMS.filter(it => (g.lv[it.id] || 0) < it.max && (g.parts > 0 || it.r === 'r')); if (!pool.length) return null; let t = 0; for (const it of pool) t += RAR[it.r].w; let r = Math.random() * t; for (const it of pool) { r -= RAR[it.r].w; if (r <= 0) return it.id; } return pool[0].id; }      // the first part of a run is always a new weapon
+function rollItem(g, big) { const leg = g.parts >= 3 && g.t > 50, W = it => RAR[it.r].w * (it.r === 'l' && big ? 4 : 1), pool = ITEMS.filter(it => (g.lv[it.id] || 0) < it.max && (g.parts > 0 || it.r === 'r') && (it.r !== 'l' || leg)); if (!pool.length) return null; let t = 0; for (const it of pool) t += W(it); let r = Math.random() * t; for (const it of pool) { r -= W(it); if (r <= 0) return it.id; } return pool[0].id; }      // the first part of a run is always a new weapon
 /* one small drawing per part, so it can be recognised on the card and in the row under the hull bar */
 function icon(c, id, x, y, r, col) { c.save(); c.translate(x, y); c.scale(r, r); c.lineWidth = .16; c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = col; c.fillStyle = col; const P = (...a) => { c.beginPath(); c.moveTo(a[0], a[1]); for (let i = 2; i < a.length; i += 2) c.lineTo(a[i], a[i + 1]); }, dot = (px, py, pr) => { c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill(); };
   if (id === 'hot') { P(-.3, .8, -.3, -.2, 0, -.85, .3, -.2, .3, .8); c.closePath(); c.fill(); P(-.75, -.3, -.6, -.7); c.stroke(); P(.75, -.3, .6, -.7); c.stroke(); }
@@ -133,6 +139,11 @@ function icon(c, id, x, y, r, col) { c.save(); c.translate(x, y); c.scale(r, r);
   else if (id === 'boom') { for (let i = 0; i < 8; i++) { c.rotate(TAU / 8); P(0, -.4, 0, -.9); c.stroke(); } dot(0, 0, .28); }
   else if (id === 'ichor') { c.beginPath(); c.moveTo(0, -.75); c.quadraticCurveTo(.6, .1, 0, .5); c.quadraticCurveTo(-.6, .1, 0, -.75); c.fill(); for (const a of [.5, 1.57, 2.64]) dot(Math.cos(a) * .85, Math.sin(a) * .5 + .35, .13); }
   else if (id === 'chain') { P(-.8, -.6, -.2, 0, -.8, .6); c.stroke(); P(-.2, -.6, .4, 0, -.2, .6); c.stroke(); c.lineWidth = .24; P(.8, -.7, .8, .7); c.stroke(); }
+  else if (id === 'heart') { c.beginPath(); c.moveTo(0, .8); c.bezierCurveTo(-1.2, -.1, -.6, -1, 0, -.35); c.bezierCurveTo(.6, -1, 1.2, -.1, 0, .8); c.fill(); }
+  else if (id === 'stride') { P(-.3, -.85, -.3, .2, .45, .2, .45, .5, -.6, .5, -.6, -.85); c.closePath(); c.fill(); c.beginPath(); c.arc(0, .55, .9, .15, Math.PI - .15); c.stroke(); }
+  else if (id === 'reaper') { c.beginPath(); c.arc(.1, .15, .8, Math.PI * .95, Math.PI * 1.9); c.stroke(); P(.1, .15, .85, -.1); c.stroke(); P(-.7, .15, -.55, .85); c.stroke(); }
+  else if (id === 'molt') { c.beginPath(); c.ellipse(0, .05, .62, .82, 0, 0, TAU); c.stroke(); P(-.55, -.1, -.2, .15, .05, -.2, .3, .1, .58, -.15); c.stroke(); }
+  else if (id === 'graft') { c.beginPath(); c.moveTo(-.85, .7); c.quadraticCurveTo(-.7, -.6, .1, -.5); c.stroke(); dot(.3, -.45, .32); dot(.8, .1, .12); dot(.55, .5, .1); dot(.9, .65, .08); }
   else if (id === 'sear') { P(-.9, -.2, -.3, -.5, -.3, .5, -.9, .2); c.closePath(); c.fill(); P(0, -.5, .85, -.85); c.stroke(); P(.05, 0, .9, 0); c.stroke(); P(0, .5, .85, .85); c.stroke(); }
   c.restore(); }
 function inBeam(g, x, z) { const dx = x - g.x, dz = z - g.z, d = Math.hypot(dx, dz); return d < 19 && d > .5 && (dx * Math.sin(g.lamp) + dz * Math.cos(g.lamp)) / d > (g.s.sear ? .72 : .8); }
@@ -160,7 +171,7 @@ function newGame(demo) {
     bob: S0(), lx: S0(), lz: S0(), roll: S0(), rec: S0(), kick: S0(), ram: S0(), crouch: S0(), antx: S0(), antz: S0(), fov: S0(), pitch: S0(),
     spin: 0, spinV: 0, fireT: 0, flash: 0, heat: 0, jet: 0, tgt: null, dash: null, dcd: 0, inv: 0, hurtT: 0, sinceHit: 9, trauma: 0, freeze: 0, boom: 0, dead: 0, smokeT: 0,
     cam: { x: 0, z: 0, d: demo ? .5 : 1 }, en: [], spawnT: 1.2, cap: null, muz: [-.6, 2.3, 1.7], lampP: [0, 2.9, 1], lampD: [0, -.2, 1],
-    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, s: baseStats() };
+    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, allies: [], fitT: {}, gr: [0, 1, 2, 3, 4, 5, 6].map(S0), stage: 0, reapA: 0, graftT: 0, graftP: [0, 3, 0], molted: false, stompFx: 0, s: baseStats() };
   if (demo) { G.feet[0].x = Math.cos(.55) * HIPW; G.feet[0].z = -Math.sin(.55) * HIPW; G.feet[1].x = -G.feet[0].x; G.feet[1].z = -G.feet[0].z; G.feet[0].a = G.feet[1].a = .55; }
   PT.length = DB.length = DL.length = TR.length = 0; cardQ.length = 0;
 }
@@ -182,7 +193,7 @@ function sparks(x, y, z, dx, dz, n, r, g, b, spd) { for (let i = 0; i < n; i++) 
 function dust(x, z, n, spd, sz) { for (let i = 0; i < n; i++) { const a = rand(0, TAU), s = rand(.3, 1) * spd; part(1, x, rand(.1, .3), z, Math.sin(a) * s, rand(.3, 1.4), Math.cos(a) * s, rand(.5, 1), sz || .35, .2, .19, .17, .3, 0, 2.5, 1.3); } }
 
 /* ---------- bugs ---------- */
-function spawnBug(x, z, kind) { const g = G, big = kind === 'big' || kind === true, spit = kind === 'spit', s = big ? 1.65 : spit ? .9 : rand(.8, .96), hp = 36 * (1 + g.t / 100 + (g.t / 260) ** 2) * g.N.hp * (big ? 12 : spit ? .8 : 1); g.en.push({ x, z, a: Math.atan2(g.x - x, g.z - z), vx: 0, vz: 0, kx: 0, kz: 0, hp, s, big, spit, state: 'chase', st: 0, cd: big ? 1.5 : spit ? rand(1, 2) : rand(.2, 1), phase: Math.random(), legs: null, fl: S0(), rear: S0(), flash: 0, burnT: 0, bias: rand(-1, 1), ldx: 0, ldz: 1, la: 0, tx: 0, tz: 0, hitP: false, dead: false }); }
+function spawnBug(x, z, kind) { const g = G, big = kind === 'big' || kind === true, spit = kind === 'spit', s = big ? 1.65 : spit ? .9 : rand(.8, .96), hp = 36 * (1 + g.t / 100 + (g.t / 260) ** 2) * g.N.hp * (big ? 12 : spit ? .8 : 1); g.en.push({ x, z, a: Math.atan2(g.x - x, g.z - z), vx: 0, vz: 0, kx: 0, kz: 0, hp, s, big, spit, state: 'chase', st: 0, cd: big ? 1.5 : spit ? rand(1, 2) : rand(.2, 1), phase: Math.random(), legs: null, fl: S0(), rear: S0(), flash: 0, burnT: 0, cutT: 0, bias: rand(-1, 1), ldx: 0, ldz: 1, la: 0, tx: 0, tz: 0, hitP: false, dead: false }); }
 const COMPASS = ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west'], compass = a => COMPASS[((Math.round(a / (TAU / 8)) % 8) + 8) % 8];
 /* The number alive has a ceiling that rises slowly, so a strong build means more kills, not a fuller screen.
    Each 40 seconds runs press, surge, lull. A brood guard arrives every 55 seconds and always drops a part. The run ends at six minutes. */
@@ -197,9 +208,10 @@ function spawnLogic(dt) { const g = G; if (g.demo || g.dead || g.won) return; co
 function hurtBug(e, dmg, dx, dz, ram) { const g = G; if (e.dead) return; e.hp -= dmg; e.flash = .09; e.fl.v += (ram ? 16 : 7) * (e.big ? .4 : 1); const kb = (ram ? 24 : 2.6) * (e.big ? .2 : 1); e.kx += dx * kb; e.kz += dz * kb;
   sparks(e.x - dx * .3, .55, e.z - dz * .3, -dx, -dz, ram ? 10 : 3, .7, 1, .25, 8); sfx.hit(); if (e.hp <= 0) killBug(e, dx, dz, ram); }
 function killBug(e, dx, dz, ram) { const g = G, s = e.s, f = ram ? 2.1 : 1; e.dead = true; g.kills++; sfx.kill();
-  if (!g.won) { g.sinceItem++; const want = g.parts ? (g.t - g.lastDrop > 20 ? clamp((g.sinceItem - 8) * .03, 0, 1) : 0) : clamp((g.sinceItem - 3) * .25, 0, 1), id = e.big || Math.random() < want ? rollItem(g) : null;      // a part roughly every twenty-odd seconds, plus one from each guard
+  if (!g.won) { g.sinceItem++; const want = g.parts ? (g.t - g.lastDrop > 20 ? clamp((g.sinceItem - 8) * .03, 0, 1) : 0) : clamp((g.sinceItem - 3) * .25, 0, 1), id = e.big || Math.random() < want ? rollItem(g, e.big) : null;      // a part roughly every twenty-odd seconds, plus one from each guard
     if (id) { g.sinceItem = 0; if (!e.big) g.lastDrop = g.t; g.drops.push({ k: 'item', id, x: e.x, z: e.z, t: 0 }); } if (e.big || (!id && Math.random() < .06)) g.drops.push({ k: 'fix', x: e.x + (id ? 1.2 : 0), z: e.z, t: 0 });
     if (g.s.leech && !g.dead) { g.hp = Math.min(g.s.maxhp, g.hp + g.s.leech); for (let i = 0; i < 3; i++) part(0, e.x, .8, e.z, (g.x - e.x) * 2.2 + rand(-1, 1), rand(1, 3), (g.z - e.z) * 2.2 + rand(-1, 1), .42, .32, .3, 1, .5, .9, 0, 0, -.4); }
+    if (g.s.heart && !e.big && g.allies.length < 4 && Math.random() < .25) raise(e.x, e.z, e.s);
     if (g.s.ichor) blast(e.x, e.z, g.s.ichor === 1 ? 2.4 : 3.3, g.s.dmg * (g.s.ichor === 1 ? 2.5 : 4), [.6, 1, .25]); if (ram && g.s.chain) g.dcd -= g.s.dashCd * .6; }
   if (e.big) { g.trauma = Math.min(1, g.trauma + .4); dust(e.x, e.z, 10, 5, .7); }
   mark(e.x + dx * .4, e.z + dz * .4, rand(.9, 1.5) * s, rand(.9, 1.5) * s, rand(0, TAU), 3, .03, .055, .012, .75, 26, rand(0, 9));
@@ -208,6 +220,12 @@ function killBug(e, dx, dz, ram) { const g = G, s = e.s, f = ram ? 2.1 : 1; e.de
   for (let i = 0; i < 7; i++) part(0, e.x, .6, e.z, rand(-3, 3) + dx * 3, rand(1, 5), rand(-3, 3) + dz * 3, rand(.2, .4), rand(.3, .6), .35, .8, .1, .7, 12, 1, -.6); }
 function bugHome(e, i, sp, out) { const side = i < 3 ? 1 : -1, row = i % 3, s = e.s, lx = side * (.92 + (row === 1 ? .16 : 0)) * s, lz = (1 - row) * .8 * s, c = Math.cos(e.a), sn = Math.sin(e.a); let x = e.x + lx * c + lz * sn, z = e.z - lx * sn + lz * c; if (sp > .6) { x += e.vx / sp * .33 * s; z += e.vz / sp * .33 * s; } out[0] = x; out[1] = z; return out; }
 const _h = [0, 0]; let tokens = 0;
+/* thralls: bugs the brood heart has raised. They run down the nearest bug and bite it, and fall apart after a few seconds */
+function raise(x, z, sc) { G.allies.push({ x, z, a: rand(0, TAU), vx: 0, vz: 0, kx: 0, kz: 0, hp: 1, s: sc, big: false, spit: false, ally: true, state: 'chase', st: 0, cd: 0, phase: Math.random(), legs: null, fl: S0(), rear: S0(), flash: 0, burnT: 0, cutT: 0, bias: rand(-1, 1), ldx: 0, ldz: 1, la: 0, tx: 0, tz: 0, life: 9, bite: 0, born: 0, dead: false }); }
+function updAlly(e, dt) { const g = G; e.life -= dt; e.born += dt; let best = null, bd = 16; for (const o of g.en) { if (o.dead) continue; const d = Math.hypot(o.x - e.x, o.z - e.z); if (d < bd) { bd = d; best = o; } }
+  let mvx = 0, mvz = 0, face = e.a; if (best) { const ux = (best.x - e.x) / (bd || 1), uz = (best.z - e.z) / (bd || 1), reach = .8 * (e.s + best.s) + .3; face = Math.atan2(ux, uz); if (bd > reach) { mvx = ux * 6.4; mvz = uz * 6.4; } e.bite -= dt; if (bd < reach + .4 && e.bite <= 0) { e.bite = .4; e.fl.v -= 9; hurtBug(best, g.s.dmg * 2.5, ux, uz); } }
+  else { const dx = g.x - e.x, dz = g.z - e.z, d = Math.hypot(dx, dz) || 1; face = Math.atan2(dx, dz); if (d > 4) { mvx = dx / d * 5; mvz = dz / d * 5; } }
+  bugMove(e, dt, mvx, mvz, face); if (e.life <= 0) { e.dead = true; for (let i = 0; i < 6; i++) part(0, e.x, .6, e.z, rand(-2, 2), rand(1, 4), rand(-2, 2), rand(.25, .45), rand(.3, .5), .3, .8, 1, .6, 8, 1, -.5); } }
 function updBug(e, dt) { const g = G, dx = g.x - e.x, dz = g.z - e.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d; let mvx = 0, mvz = 0, face = Math.atan2(ux, uz); e.cd -= dt; e.st -= dt;
   if (e.spit) {       // keeps its distance and lobs acid at where you are heading; the landing spot is marked from the moment it winds up
     if (e.state === 'chase') { const spd = 4 * ST.espd * g.N.spd * (g.s.sear && inBeam(g, e.x, e.z) ? .65 : 1), sd = e.bias > 0 ? 1 : -1; if (d > 10.5) { mvx = ux * spd * (d > 14 ? 1.6 : 1); mvz = uz * spd * (d > 14 ? 1.6 : 1); } else if (d < 6) { mvx = -ux * 3; mvz = -uz * 3; } else { mvx = -uz * sd * 1.3; mvz = ux * sd * 1.3; }
@@ -221,9 +239,11 @@ function updBug(e, dt) { const g = G, dx = g.x - e.x, dz = g.z - e.z, d = Math.h
   } else if (e.state === 'tell') { face = e.la; if (e.st <= 0) { e.state = 'lunge'; e.st = e.big ? .5 : LUNGE_T; e.hitP = false; sfx.lunge(); } }
   else if (e.state === 'lunge') { face = e.la; const lv = e.big ? 20 : LUNGE_V; mvx = e.ldx * lv; mvz = e.ldz * lv; if (!e.hitP && d < (e.big ? 2.1 : 1.3)) { e.hitP = true; hurtPlayer(e.big ? 22 : 12, e.ldx, e.ldz); } if (e.st <= 0) { e.state = 'rec'; e.st = e.big ? 1.3 : .6; dust(e.x, e.z, e.big ? 8 : 3, e.big ? 4 : 2); } }
   else { face = e.a; if (e.st <= 0) { e.state = 'chase'; e.cd = e.big ? rand(1.6, 2.4) : rand(1.2, 2.4); } }
+  bugMove(e, dt, mvx, mvz, face); }
+function bugMove(e, dt, mvx, mvz, face) { const g = G;
   const k = 1 - Math.exp(-dt * (e.state === 'lunge' ? 30 : 9)); e.vx += (mvx - e.vx) * k; e.vz += (mvz - e.vz) * k; const kd = Math.exp(-dt * 7); e.kx *= kd; e.kz *= kd;
   e.x += (e.vx + e.kx) * dt; e.z += (e.vz + e.kz) * dt; pushOut(e, .5 * e.s); e.a += clamp(angDiff(e.a, face), -9 * dt, 9 * dt);
-  spring(e.rear, e.state === 'tell' ? 1 : 0, 170, 15, dt); spring(e.fl, 0, 260, 17, dt); e.flash -= dt; e.burnT -= dt;
+  spring(e.rear, e.state === 'tell' ? 1 : 0, 170, 15, dt); spring(e.fl, 0, 260, 17, dt); e.flash -= dt; e.burnT -= dt; e.cutT -= dt;
   // legs: two tripods, each foot stays planted on the ground until it is its turn to swing
   const sp = Math.hypot(e.vx, e.vz), st = 1.5 * e.s; if (!e.legs) { e.legs = []; for (let i = 0; i < 6; i++) { bugHome(e, i, 0, _h); e.legs.push({ x: _h[0], z: _h[1], y: 0, sw: false, fx: 0, fz: 0 }); } }
   let need = false; for (let i = 0; i < 6; i++) { const L = e.legs[i]; bugHome(e, i, 0, _h); if (L.sw || Math.hypot(L.x - _h[0], L.z - _h[1]) > .4 * e.s) need = true; }
@@ -241,14 +261,18 @@ function shockwave(r, dmg) { const g = G; for (const e of g.en) { if (e.dead) co
 function hurtPlayer(d, dx, dz) { const g = G; if (g.inv > 0 || g.dead || g.demo || g.won) return;
   if (g.s.shock && g.shieldT <= 0) { g.shieldT = g.s.shock; g.inv = .5; shockwave(5.5, g.s.dmg * 3); return; }       // the plating takes this one
   g.hp -= d * ST.dmg; g.inv = .45; g.hurtT = 1; g.sinceHit = 0; g.trauma = Math.min(1, g.trauma + .45); if (ST.hitstop) g.freeze = .06; g.rec.v -= 5; g.roll.v += rand(-4, 4); g.vx += dx * 5; g.vz += dz * 5;
-  sparks(g.x, 2, g.z, dx, dz, 12, 1, .7, .3, 10); sfx.hurt(); if (g.hp <= 0) die(); else if (g.hp < 30) cap('Hull critical'); }
+  sparks(g.x, 2, g.z, dx, dz, 12, 1, .7, .3, 10); sfx.hurt();
+  if (g.hp <= 0 && g.s.molt && !g.molted) { g.molted = true; g.hp = g.s.maxhp * .5; g.inv = 1.6; shockwave(7.5, g.s.dmg * 8); g.trauma = 1; g.crouch.v += 7; cap('The second shell is shed. Half your hull is back.', 4); for (let i = 0; i < 14; i++) debris(MESH.cube, g.x + rand(-.6, .6), rand(2, 3), g.z + rand(-.6, .6), rand(.3, .7), .07, rand(.3, .7), BONE, 0, rand(-9, 9), rand(4, 11), rand(-9, 9), rand(2, 3.5)); return; }
+  if (g.hp <= 0) die(); else if (g.hp < 30) cap('Hull critical'); }
 function die() { const g = G; g.hp = 0; g.dead = .001; g.dash = null; g.boom = 1; g.trauma = 1; sfx.boom(); cap('Wrecked'); mark(g.x, g.z, 3, 3, 0, 0, 0, 0, 0, .8, 60);
   for (let i = 0; i < 16; i++) debris(MESH.cube, g.x + rand(-.5, .5), rand(1.6, 2.8), g.z + rand(-.5, .5), rand(.2, .8), rand(.15, .5), rand(.2, .8), Math.random() < .6 ? YEL : DRK, 0, rand(-9, 9), rand(5, 14), rand(-9, 9), rand(3, 5));
   for (let i = 0; i < 40; i++) { const a = rand(0, TAU), s = rand(2, 13); part(0, g.x, rand(1.5, 2.6), g.z, Math.sin(a) * s, rand(1, 9), Math.cos(a) * s, rand(.4, 1), rand(.6, 1.6), 1, rand(.4, .7), .12, 1, 6, 2, -.6); } dust(g.x, g.z, 16, 7, .8); }
 function startDash(dx, dz) { const g = G; if (!g || g.dash || g.dcd > 0 || g.dead || g.demo || state !== 'play') return; const l = Math.hypot(dx, dz); if (l < .01) { dx = Math.sin(g.head); dz = Math.cos(g.head); } else { dx /= l; dz /= l; }
   const B = DASH.burst * (g.s.chain ? 1.5 : 1); g.dash = { t: 0, dx, dz, hit: new Set(), skidded: false, B }; g.dcd = g.s.dashCd; g.inv = Math.max(g.inv, DASH.wind + B + .08); g.crouch.v += 5.5; g.fov.v += 2.4; g.trauma = Math.min(1, g.trauma + .22); sfx.dash();
   dust(g.x, g.z, 14, 6, .55); mark(g.x, g.z, 1.7, 1.7, 0, 0, 0, 0, 0, .55, 9); }
-function stomp(f, side) { const g = G; g.bob.v -= 1.5; g.roll.v += side * .9; g.trauma = Math.min(1, g.trauma + .03); dust(f.x, f.z, 2, 1.6, .28); if (!g.demo) sfx.step(); }
+function stomp(f, side) { const g = G; g.bob.v -= 1.5; g.roll.v += side * .9; g.trauma = Math.min(1, g.trauma + .03); dust(f.x, f.z, 2, 1.6, .28); if (!g.demo) sfx.step();
+  if (g.s.stride && !g.demo && !g.dead) { g.stompFx = 1; g.bob.v -= 1; g.trauma = Math.min(1, g.trauma + .03); dust(f.x, f.z, 4, 3.5, .4); DL.push({ x: f.x, z: f.z, sx: .5, sz: .5, rot: 0, kind: 1, r: 1, g: .65, b: .2, a: .7, t: 0, life: .22, seed: 0, grow: 10 }); mark(f.x, f.z, .9, .9, rand(0, TAU), 3, 0, 0, 0, .45, 5, rand(0, 9));
+    for (const e of g.en) { if (e.dead) continue; const ex = e.x - f.x, ez = e.z - f.z, d = Math.hypot(ex, ez) || 1; if (d < 2.5 + .4 * e.s) { e.kx += ex / d * (e.big ? 1 : 5); e.kz += ez / d * (e.big ? 1 : 5); hurtBug(e, g.s.dmg * 1.6, ex / d, ez / d); } } } }
 function gait(g, dt, burst) { const sp = Math.hypot(g.vx, g.vz), rx = Math.cos(g.head), rz = -Math.sin(g.head), ux = sp > .01 ? g.vx / sp : 0, uz = sp > .01 ? g.vz / sp : 0, mv = sp > 1.2;
   if (burst) { const d = g.dash, k = 1 - Math.exp(-dt * 40); for (let i = 0; i < 2; i++) { const f = g.feet[i], side = i ? -1 : 1, oz = i ? .7 : -.95, tx = g.x + d.dz * side * HIPW * 1.2 + d.dx * oz, tz = g.z - d.dx * side * HIPW * 1.2 + d.dz * oz; f.x += (tx - f.x) * k; f.z += (tz - f.z) * k; f.y = 0; f.sw = false; f.a = Math.atan2(d.dx, d.dz); } return; }   // braced and sliding
   let need = false; for (let i = 0; i < 2; i++) { const f = g.feet[i], side = i ? -1 : 1; if (f.sw || Math.hypot(f.x - g.x - rx * side * HIPW, f.z - g.z - rz * side * HIPW) > .42) need = true; }
@@ -301,8 +325,14 @@ function update(dt) { const g = G; g.t += dt;
     while (g.drones.length < g.s.drone) g.drones.push({ x: g.x, y: 3, z: g.z, ft: rand(.1, .5), fl: 0, a: 0 });
     g.drones.forEach((d, i) => { const an = g.t * 1.5 + i * TAU / g.drones.length, k = 1 - Math.exp(-dt * 6); d.x += (g.x + Math.sin(an) * 2.8 - d.x) * k; d.z += (g.z + Math.cos(an) * 2.8 - d.z) * k; d.y = 3.1 + Math.sin(g.t * 3 + i * 2) * .15; d.ft -= dt; d.fl = Math.max(0, d.fl - dt * 12);
       if (d.ft <= 0) { let best = null, bd = 8.5; for (const e of g.en) { if (e.dead) continue; const q = Math.hypot(e.x - d.x, e.z - d.z); if (q < bd) { bd = q; best = e; } } if (best) { d.ft = .33; d.fl = 1; d.a = Math.atan2(best.x - d.x, best.z - d.z); const l = bd || 1; TR.push({ x0: d.x, y0: d.y - .1, z0: d.z, x1: best.x, y1: .55, z1: best.z, t: 0, dur: Math.max(.03, bd / 90), c: 1 }); hurtBug(best, g.s.dmg, (best.x - d.x) / l, (best.z - d.z) / l); sfx.pew(); } else d.ft = .1; } });
+    if (g.s.reaper) { g.reapA += dt * 4.2; for (let b = 0; b < 2; b++) { const a = g.reapA + b * Math.PI, ax = Math.sin(a), az = Math.cos(a); for (const e of g.en) { if (e.dead || e.cutT > 0) continue; const ex = e.x - g.x, ez = e.z - g.z, al = ex * ax + ez * az, pr = Math.abs(ex * az - ez * ax); if (al > 1.2 && al < 3.5 + .4 * e.s && pr < .5 + .45 * e.s) { e.cutT = .3; e.kx += az * 4; e.kz -= ax * 4; hurtBug(e, g.s.dmg * 3, az, -ax); sparks(e.x, .7, e.z, az, -ax, 4, .9, 1, .5, 9); } } } }
+    if (g.s.graft) { g.graftT -= dt; if (g.graftT <= 0) { let a = null, b = null, ad = 196, bd = 196; for (const e of g.en) { if (e.dead) continue; const d2 = (e.x - g.x) ** 2 + (e.z - g.z) ** 2; if (d2 < ad) { b = a; bd = ad; a = e; ad = d2; } else if (d2 < bd) { b = e; bd = d2; } } const tg = b || a;
+      if (tg) { g.graftT = .45; const P = g.graftP, l = Math.hypot(tg.x - P[0], tg.z - P[2]) || 1; TR.push({ x0: P[0], y0: P[1], z0: P[2], x1: tg.x, y1: .55, z1: tg.z, t: 0, dur: Math.max(.04, l / 60), c: 2 }); hurtBug(tg, g.s.dmg * 1.5, (tg.x - P[0]) / l, (tg.z - P[2]) / l); blast(tg.x, tg.z, 1.7, g.s.dmg * 1.2, [.7, .9, .15]); sfx.spit(); } else g.graftT = .15; } }
     if (g.s.sear && tickNow) for (const e of g.en) if (!e.dead && inBeam(g, e.x, e.z) && (e.x - g.x) ** 2 + (e.z - g.z) ** 2 < 200) { hurtBug(e, g.s.dmg * .5 * g.s.sear, 0, 0); e.burnT = .3; }
   }
+  for (const e of g.allies) updAlly(e, dt); for (let i = g.allies.length - 1; i >= 0; i--) if (g.allies[i].dead) g.allies.splice(i, 1); if (g.dead || g.won) for (const e of g.allies) e.life = Math.min(e.life, .3);
+  let stg = 0; for (let i = 1; i < 7; i++) { const on = g.parts >= GROW[i]; if (on) stg = i; spring(g.gr[i], on ? 1 : 0, 70, 9, dt); } if (stg > g.stage) { g.stage = stg; if (stg === 1) cap('The parts are taking hold.', 3.5); else if (stg === 4) cap('The machine is growing.', 3.5); else if (stg === 6) cap('There is not much machine left.', 3.5); }
+  g.stompFx = Math.max(0, g.stompFx - dt * 5);
   for (let i = g.shells.length - 1; i >= 0; i--) { const sh = g.shells[i]; sh.t += dt; if (sh.t > 0 && Math.random() < dt * 40) { const u = sh.t / sh.dur; part(1, lerp(sh.x0, sh.x1, u), lerp(sh.y0, .3, u) + Math.sin(u * Math.PI) * 6, lerp(sh.z0, sh.z1, u), 0, .3, 0, .5, .2, .3, .28, .25, .35, 0, 1, .6); } if (sh.t >= sh.dur) { g.shells.splice(i, 1); blast(sh.x1, sh.z1, 3.1, g.s.dmg * 5); } }
   for (let i = g.globs.length - 1; i >= 0; i--) { const b = g.globs[i]; b.t += dt; if (b.t >= b.dur) { g.globs.splice(i, 1); g.pools.push({ x: b.x1, z: b.z1, t: 3.6, seed: rand(0, 9) }); sfx.splat(); for (let k = 0; k < 8; k++) { const a = rand(0, TAU), v = rand(1, 4); part(0, b.x1, .3, b.z1, Math.sin(a) * v, rand(1, 4), Math.cos(a) * v, rand(.25, .45), rand(.3, .5), .7, .9, .15, .7, 10, 1, -.5); } if (Math.hypot(g.x - b.x1, g.z - b.z1) < 2) hurtPlayer(10, 0, 0); } }
   for (let i = g.pools.length - 1; i >= 0; i--) { const q = g.pools[i]; q.t -= dt; if (q.t <= 0) { g.pools.splice(i, 1); continue; } if (q.t > .4 && Math.hypot(g.x - q.x, g.z - q.z) < 1.8) hurtPlayer(6, 0, 0); if (Math.random() < dt * 5) part(0, q.x + rand(-1.2, 1.2), .15, q.z + rand(-1.2, 1.2), 0, rand(.8, 1.6), 0, .5, .22, .7, .9, .15, .5, 0, 1, -.2); }
@@ -354,11 +384,16 @@ const _H = [0, 0, 0], _K = [0, 0, 0], _A = [0, 0, 0], _B = [0, 0, 0], _P = [0, 0
 function W0() { push(); M4.ident(STK[sp]); }
 function xfd(x, y, z, o) { const m = STK[sp]; o[0] = m[0] * x + m[4] * y + m[8] * z; o[1] = m[1] * x + m[5] * y + m[9] * z; o[2] = m[2] * x + m[6] * y + m[10] * z; return o; }
 function box(x, y, z, sx, sy, sz, col, e) { push(); T(x, y, z); draw(MESH.cube, sx, sy, sz, col, e); pop(); }
+function fitK(g, id) { if (!g.lv[id]) return 0; const u = clamp((g.t - (g.fitT[id] || 0)) / .45, 0, 1), c = 1.70158; return Math.max(.001, 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2)); }      // a new fitting pops out and settles
+function at(x, y, z, k) { push(); T(x, y, z); SCL(k); T(-x, -y, -z); }
+const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 function drawMech(g) {
   const hx = Math.sin(g.head), hz = Math.cos(g.head), rx = hz, rz = -hx, sp = Math.hypot(g.vx, g.vz), wk = clamp(sp / 6.4, 0, 1), burst = g.ram.x;
   let py = HIP + g.bob.x - Math.max(-.1, g.crouch.x) * .32 + Math.sin(g.t * 13) * .005;
   for (let i = 0; i < 2; i++) { const f = g.feet[i], side = i ? -1 : 1, dh = Math.hypot(f.x - g.x - rx * side * HIPW, f.z - g.z - rz * side * HIPW); py = Math.min(py, Math.sqrt(Math.max(.5, REACH * REACH - dh * dh)) + f.y * .5 + .2); }
   g.py = py; const sway = Math.sin(g.phase * TAU) * .07 * wk, twist = Math.sin(g.phase * TAU) * .09 * wk;
+  const G1 = clamp(g.gr[1].x, 0, 1.3), G2 = clamp(g.gr[2].x, 0, 1.3), G3 = clamp(g.gr[3].x, 0, 1.3), G4 = clamp(g.gr[4].x, 0, 1.3), G5 = clamp(g.gr[5].x, 0, 1.3), G6 = clamp(g.gr[6].x, 0, 1.3);      // how far the alien parts have taken over, in six stages
+  const HULL = mix3(YEL, [.36, .17, .04], Math.min(1, G6) * .6), THIGH = mix3(YEL, CHITM, Math.min(1, G6) * .8), GUARD = mix3(YEL2, CHITM, Math.min(1, G2)), TEND = fitK(g, 'stride'); let k;
   decal(g.x, g.z, 1.5, 1.5, 0, 0, 0, 0, 0, .5);
   reset(); T(g.x + rx * sway, py, g.z + rz * sway); RX(g.lz.x); RZ(-g.lx.x); RY(g.head + twist);
   // pelvis
@@ -366,37 +401,62 @@ function drawMech(g) {
   push(); T(0, .26, 0); draw(MESH.cyl, 1.02, .2, 1.02, STL, -.8); pop();
   // legs: the feet are where the walk put them; the knees are solved to reach
   for (let i = 0; i < 2; i++) { const f = g.feet[i], side = i ? -1 : 1; xf(side * HIPW, -.06, 0, _H); _A[0] = f.x; _A[1] = f.y + .22; _A[2] = f.z; _P[0] = -hx; _P[1] = .3; _P[2] = -hz; ik2(_H, _A, L1, L2, _P, _K);
-    seg(MESH.cube, _H, _K, .36, .46, YEL, 0, [rx, 0, rz]); seg(MESH.cube, _K, _A, .22, .28, STL, -.7, [rx, 0, rz]);
+    seg(MESH.cube, _H, _K, .36, .46, THIGH, G6 > .5 ? -.6 : 0, [rx, 0, rz]); seg(MESH.cube, _K, _A, .22, .28, STL, -.7, [rx, 0, rz]);
+    if (TEND > 0) { for (const o of [-.21, .21]) { for (let q = 0; q < 3; q++) { _B[q] = _H[q] + [rx, 0, rz][q] * o; _F[q] = _K[q] + [rx, 0, rz][q] * o; } seg(MESH.cyl, _B, _F, .15 * TEND, .15 * TEND, FLESH); } for (let q = 0; q < 3; q++) { _B[q] = _K[q] - [hx, 0, hz][q] * .2; _F[q] = _A[q] - [hx, 0, hz][q] * .14; } seg(MESH.cyl, _B, _F, .16 * TEND, .16 * TEND, FLESH); if (g.stompFx > 0 && !f.sw) glow(f.x, .25, f.z, 1.6 * g.stompFx, 1, .6, .2, .5 * g.stompFx); }       // titan tendons: cords of muscle down each leg
     for (let q = 0; q < 3; q++) { _B[q] = lerp(_H[q], _K[q], .3) - [hx, 0, hz][q] * .26; _F[q] = lerp(_K[q], _A[q], .5) - [hx, 0, hz][q] * .08; } seg(MESH.cyl, _B, _F, .09, .09, STL, -.9);     // the piston behind the knee
-    for (let q = 0; q < 3; q++) { _B[q] = lerp(_K[q], _A[q], .25) + [hx, 0, hz][q] * .17; _F[q] = lerp(_K[q], _A[q], .8) + [hx, 0, hz][q] * .17; } seg(MESH.cube, _B, _F, .3, .08, YEL2, 0, [rx, 0, rz]);      // shin guard
+    for (let q = 0; q < 3; q++) { _B[q] = lerp(_K[q], _A[q], .25) + [hx, 0, hz][q] * .17; _F[q] = lerp(_K[q], _A[q], .8) + [hx, 0, hz][q] * .17; } seg(MESH.cube, _B, _F, .3 + .06 * G2, .08 + .04 * G2, GUARD, G2 > .5 ? -.6 : 0, [rx, 0, rz]);      // shin guard, chitin once the parts take hold
     W0(); T(_K[0], _K[1], _K[2]); RY(g.head); RZ(Math.PI / 2); draw(MESH.cyl, .36, .5, .36, DRK, -.7); pop();
+    if (G2 > .02) { W0(); T(_K[0], _K[1], _K[2]); RY(g.head); RX(-1.0); SCL(G2); T(0, .34, 0); draw(MESH.cone, .22, .66, .22, BONE); pop(); }       // knee spur
     W0(); T(_H[0], _H[1], _H[2]); RY(g.head); RZ(Math.PI / 2); draw(MESH.cyl, .46, .34, .46, DRK, -.7); pop();
-    W0(); T(f.x, f.y + .1, f.z); RY(f.a); RX(f.sw ? Math.sin((g.phase + i * .5) % 1 / SWING * Math.PI * 2) * .35 : 0); box(0, 0, .1, .5, .2, .9, DRK, -.6); box(0, .12, -.05, .34, .16, .4, STL, -.7); box(.14, -.02, .6, .17, .16, .32, YEL2); box(-.14, -.02, .6, .17, .16, .32, YEL2); box(0, -.02, -.42, .2, .16, .22, YEL2); pop();
+    W0(); T(f.x, f.y + .1, f.z); RY(f.a); RX(f.sw ? Math.sin((g.phase + i * .5) % 1 / SWING * Math.PI * 2) * .35 : 0); box(0, 0, .1, .5, .2, .9, DRK, -.6); box(0, .12, -.05, .34, .16, .4, STL, -.7); box(.14, -.02, .6, .17, .16, .32, YEL2); box(-.14, -.02, .6, .17, .16, .32, YEL2); box(0, -.02, -.42, .2, .16, .22, YEL2); if (G4 > .02) for (const o of [-.14, .14]) { push(); T(o, .0, .74); RX(Math.PI / 2 + .3); SCL(G4); T(0, .18, 0); draw(MESH.cone, .16, .42, .16, BONE); pop(); } if (TEND > 0) box(0, .2, .1, .46 * TEND, .1, .6 * TEND, BONE); pop();
     decal(f.x, f.z, .5, .68, f.a, 0, 0, 0, 0, .6 * (1 - Math.min(1, f.y * 2.2))); }
   if (g.dead) { glow(g.x, py + .5, g.z, 2.2 + Math.sin(g.t * 30) * .3, 1, .5, .12, .5); return; }
   // torso: turns to the target on its own ring, pitches with recoil, rolls when a foot lands
   T(0, .36, 0); RY(g.aim - g.head - twist); RX(-g.rec.x * .05 + burst * .22); RZ(g.roll.x * .035);
-  box(0, .56, .04, 1.32, .96, 1.12, YEL); box(0, .16, .5, 1.0, .3, .34, DRK, -.6);                         // cab and chin
+  box(0, .56, .04, 1.32, .96, 1.12, HULL); box(0, .16, .5, 1.0, .3, .34, DRK, -.6);                         // cab and chin
   box(-.08, .78, .61, .9, .17, .05, [.9, .5, .12], .55); box(-.08, .92, .65, 1.04, .1, .2, YEL2); box(-.08, .64, .63, 1.04, .08, .1, DRK); box(.3, .4, .62, .5, .3, .06, YEL2); box(-.36, .42, .62, .3, .22, .05, DRK);          // a visor slit under a hood, patched plating below
   box(0, 1.08, -.05, .7, .1, .7, YEL2); box(.66, .56, .1, .05, .5, .7, DRK); box(-.66, .56, .1, .05, .5, .7, DRK);
   box(.44, 1.1, .3, .34, .1, .34, DRK); push(); T(.44, 1.18, .3); RY(angDiff(g.aim, g.lamp)); draw(MESH.cyl, .2, .14, .2, STL, -.8);       // the one big work lamp, bolted on off-centre, on a swivel
     push(); T(0, .12, .16); RX(Math.PI / 2 - .5); draw(MESH.cyl, .42, .3, .42, DRK, -.7); T(0, .15, 0); draw(MESH.cyl, .33, .03, .33, g.s.sear ? [1, .7, .35] : [1, .92, .75], 3); pop();
+    if (g.s.sear) { box(0, .42, .16, .58, .08, .62, CHITM, -.6); box(.28, .2, .1, .06, .4, .5, CHIT, -.6); box(-.28, .2, .1, .06, .4, .5, CHIT, -.6); }
     xf(0, .08, .34, _B); glow(_B[0], _B[1], _B[2], .7, 1, .9, .7, .75); xf(0, .06, .66, g.lampP); xfd(0, -.62, 1, g.lampD); pop();
   box(0, .58, -.76, 1.08, .84, .5, DRK, -.6); box(0, .9, -1.03, .8, .12, .06, STL); box(0, .66, -1.03, .8, .12, .06, STL); box(0, .42, -1.03, .8, .12, .06, STL);                // engine and its grille
   for (const k of [-1, 1]) { push(); T(k * .4, 1.3, -.84); draw(MESH.cyl, .15, .8, .15, STL, -.8); T(0, .36, 0); draw(MESH.cyl, .19, .1, .19, RUST); pop();
-    push(); T(k * .3, .34, -1.06); RX(-Math.PI / 2); draw(MESH.cyl, .34, .26, .34, STL, -.8); if (g.jet > .03) { const L = (1.5 + Math.sin(g.t * 90 + k) * .25) * g.jet; T(0, .1 + L / 2, 0); draw(MESH.cone, .3, L, .3, [1, .55, .15], 5 * g.jet); T(0, -L * .2, 0); draw(MESH.cone, .15, L * .55, .15, [.8, .9, 1], 7 * g.jet); } pop(); }
+    push(); T(k * .3, .34, -1.06); RX(-Math.PI / 2); draw(MESH.cyl, .34, .26, .34, STL, -.8); if (g.s.burn) { T(0, .14, 0); draw(MESH.cyl, .4, .05, .4, [.6, .2, .04], .5); T(0, -.14, 0); } if (g.jet > .03) { const L = (1.5 + Math.sin(g.t * 90 + k) * .25) * g.jet; T(0, .1 + L / 2, 0); draw(MESH.cone, .3, L, .3, [1, .55, .15], 5 * g.jet); T(0, -L * .2, 0); draw(MESH.cone, .15, L * .55, .15, [.8, .9, 1], 7 * g.jet); } pop(); }
   if (g.jet > .03) { xf(0, .34, -1.5, _B); glow(_B[0], _B[1], _B[2], 2.4 * g.jet, 1, .6, .25, .7 * g.jet); }
   xf(-.52, 1.1, -.4, _A); _B[0] = _A[0] + g.antx.x; _B[1] = _A[1] + 1.25; _B[2] = _A[2] + g.antz.x; seg(MESH.cyl, _A, _B, .035, .035, DRK); if (Math.sin(g.t * 5) > .3) glow(_B[0], _B[1], _B[2], .3, 1, .15, .1, .9);    // whip antenna with a beacon
   box(.84, .78, .02, .4, .5, .62, YEL); box(-.84, .78, .02, .4, .5, .62, YEL); box(.84, 1.05, .02, .44, .06, .66, DRK); box(-.84, 1.05, .02, .44, .06, .66, DRK);                 // shoulders
   if (g.s.shock) { const e = g.shieldT <= 0 ? 2.6 : .15; box(.86, 1.1, .02, .3, .04, .5, [.3, .6, 1], e); box(-.86, 1.1, .02, .3, .04, .5, [.3, .6, 1], e); box(0, .3, .7, .9, .3, .07, STL, -.8); box(0, .3, .74, .7, .05, .02, [.3, .6, 1], e); if (g.shieldT <= 0) decal(g.x, g.z, 2.1, 2.1, 0, 1, .3, .6, 1, .35, .012); }
   if (g.s.boom) box(-.98, .98, -.1, .26, .22, .4, [.5, .08, .04]); if (g.lv.belt) box(-.98, .34, -.2, .3, .3, .5, BRASS, -.9);
-  if (g.s.mortar) { push(); T(.86, 1.36, -.18); RX(-.45); draw(MESH.cyl, .34, .86, .34, DRK, -.7); T(0, .44, 0); draw(MESH.cyl, .4, .08, .4, STL, -.8); pop(); box(.86, 1.12, -.2, .5, .14, .5, YEL2); }
-  if (g.s.coil) { push(); T(0, 1.5, -.5); draw(MESH.cyl, .09, .9, .09, STL, -.8); const e = .5 + Math.max(0, 1 - (1.05 - g.coilT) * 5) * 2.5; for (const k of [-.2, .05, .3]) { push(); T(0, k, 0); draw(MESH.cyl, .4 - k * .3, .06, .4 - k * .3, [.35, .6, 1], e); pop(); } pop(); }
+  if (g.s.mortar) { at(.86, 1.1, -.18, fitK(g, 'mortar')); push(); T(.86, 1.36, -.18); RX(-.45); draw(MESH.cyl, .34, .86, .34, DRK, -.7); T(0, .44, 0); draw(MESH.cyl, .4, .08, .4, STL, -.8); pop(); box(.86, 1.12, -.2, .5, .14, .5, YEL2); pop(); }
+  if (g.s.coil) { at(0, 1.1, -.5, fitK(g, 'coil')); push(); T(0, 1.5, -.5); draw(MESH.cyl, .1, .9, .1, STL, -.8); const e = .8 + Math.max(0, 1 - (1.05 - g.coilT) * 5) * 3; for (const q of [-.3, -.18, -.06, .06, .18]) { push(); T(0, q, 0); draw(MESH.cyl, .26, .07, .26, BRASS, -.9); pop(); } T(0, .5, 0); draw(MESH.sph, .3, .3, .3, [.25, .5, 1], e); xf(0, 0, 0, _B); glow(_B[0], _B[1], _B[2], .6 + e * .15, .4, .6, 1, .35); pop(); pop(); }
+  // the rest of what has been fitted
+  if ((k = fitK(g, 'cool')) > 0) { at(0, .5, -.8, k); for (const q of [-1, 1]) { box(q * .6, .52, -.8, .1, .7, .1, STL, -.8); box(q * .66, .52, -.8, .03, .6, .05, [.3, .8, 1], 1.4); } pop(); }
+  if ((k = fitK(g, 'weld')) > 0) { at(-.5, .2, -.9, k); push(); T(-.5, .24, -1.1); draw(MESH.cyl, .26, .44, .26, [.12, .3, .16], -.6); T(0, .24, 0); draw(MESH.cyl, .12, .08, .12, [.3, 1, .5], 1.5); pop(); pop(); }
+  if ((k = fitK(g, 'ichor')) > 0) { at(0, .7, -.8, k); for (const q of [-1, 1]) { const pu = 1 + Math.sin(g.t * 4 + q) * .08; push(); T(q * .62, .74, -.82); draw(MESH.sph, .42 * pu, .5 * pu, .46 * pu, [.22, .42, .04], .45); pop(); } pop(); }
+  if ((k = fitK(g, 'heart')) > 0) { const bt = Math.pow(Math.max(0, Math.sin(g.t * 6.5)), 6), pu = 1 + bt * .16; at(0, .9, -1.0, k); push(); T(0, .94, -1.14); draw(MESH.sph, .66 * pu, .7 * pu, .56 * pu, [.5, .05, .04], .22 + bt * .8); pop(); for (const q of [-1, 1]) { xf(q * .2, 1.1, -1.0, _A); xf(q * .5, 1.06, -.3, _B); seg(MESH.cyl, _A, _B, .09, .09, FLESH); } pop(); xf(0, .94, -1.34, _B); glow(_B[0], _B[1], _B[2], 1.6 + bt, 1, .2, .12, (.25 + bt * .35) * Math.min(1, k)); }      // the brood heart beats
+  if (g.s.molt && !g.molted && (k = fitK(g, 'molt')) > 0) { at(0, 1.1, 0, k); box(0, 1.16, -.05, .96, .09, 1.0, BONE); box(.86, 1.13, .02, .56, .09, .74, BONE); box(-.86, 1.13, .02, .56, .09, .74, BONE); box(.7, .62, -.04, .07, .6, .8, BONE); box(-.7, .62, -.04, .07, .6, .8, BONE); pop(); }
+  if ((k = fitK(g, 'graft')) > 0) { at(-.6, 1.1, -.5, k); xf(-.6, 1.1, -.5, _A); xf(-.78, 1.85, -.4, _K); xf(-.7, 1.9, .3, _F); seg(MESH.cube, _A, _K, .16, .18, CHIT2, -.5); seg(MESH.cube, _K, _F, .13, .15, CHIT, -.5); const pu = 1 + Math.max(0, 1 - (.45 - g.graftT) * 6) * .3; push(); T(-.7, 1.9, .42); draw(MESH.sph, .36 * pu, .34 * pu, .44 * pu, [.4, .55, .07], .55); pop(); xf(-.7, 1.9, .66, g.graftP); pop(); }
+  if ((k = fitK(g, 'reaper')) > 0) for (let b = 0; b < 2; b++) { const a = g.reapA + b * Math.PI, ax = Math.sin(a), az = Math.cos(a); xf(b ? -.45 : .45, .95, -.75, _A); _F[0] = g.x + ax * 1.5 * k; _F[1] = 1.55; _F[2] = g.z + az * 1.5 * k; _P[0] = 0; _P[1] = 1; _P[2] = 0; ik2(_A, _F, 1.35, 1.35, _P, _K); seg(MESH.cube, _A, _K, .15, .17, FLESH); seg(MESH.cube, _K, _F, .12, .14, BONE);
+    _B[0] = g.x + ax * 3.6 * k; _B[1] = .75; _B[2] = g.z + az * 3.6 * k; seg(MESH.cone, _F, _B, .55, .07, BONE, 0, [0, 1, 0]); sprite(PADD, _B[0] - az * .7, .8, _B[2] + ax * .7, .3, 0, az * .9, 0, -ax * .9, .9, .95, .8, .18); }
+  // what has grown: chitin, cords, sacs, spines, ribs, and in the end a face
+  if (G1 > .02) { at(.68, .5, -.1, G1); push(); T(.68, .52, -.12); RX(.12); draw(MESH.cube, .08, .56, .66, CHITM, -.6); pop(); push(); T(.7, .3, .28); RX(-.2); draw(MESH.cube, .07, .3, .34, CHIT, -.6); pop(); pop();
+    at(-.2, 1.06, -.3, G1); push(); T(-.22, 1.09, -.3); RY(.3); draw(MESH.cube, .56, .07, .46, CHITM, -.6); pop(); pop(); for (const q of [-1, 1]) { xf(q * .34, 1.02, -.72, _A); xf(q * .8, 1.02, -.12, _B); seg(MESH.cyl, _A, _B, .07 * G1, .07 * G1, FLESH); } }
+  if (G2 > .02) for (const q of [-1, 1]) { const pu = (1 + Math.sin(g.t * 3.3 + q * 2) * .1) * G2; push(); T(q * .3, .78, -1.06); draw(MESH.sph, .34 * pu, .36 * pu, .3 * pu, [.22, .45, .05], .45); pop(); }
+  if (G3 > .02) { for (const q of [-1, 1]) { at(q * .86, 1.08, .02, G3); for (let i = 0; i < 3; i++) { push(); T(q * (.84 + i * .03), 1.12 + i * .035, .26 - i * .25); RX(-.22); RZ(-q * .16); draw(MESH.cube, .62 - i * .05, .09, .36, CHITM, -.7); pop(); } for (const z of [-.2, .22]) { push(); T(q * .98, 1.2, z); RZ(-q * .7); T(0, .2, 0); draw(MESH.cone, .15, .46, .15, BONE); pop(); } pop(); }
+    xf(.5, 1.1, -.42, _A); _B[0] = _A[0] + g.antx.x * 1.4 + Math.sin(g.t * 2.1) * .12; _B[1] = _A[1] + G3; _B[2] = _A[2] + g.antz.x * 1.4 + .25; seg(MESH.cyl, _A, _B, .05, .05, FLESH); glow(_B[0], _B[1], _B[2], .28, .5, 1, .2, .7); }
+  if (G4 > .02) for (let i = 0; i < 4; i++) { const z = .3 - i * .38, h = (.34 + i * .07) * G4; push(); T(-.16, 1.1, z); RX(-.45); T(0, h / 2, 0); draw(MESH.cone, .17, h, .22, BONE); pop(); }
+  if (G5 > .02) { for (const q of [-1, 1]) for (const z of [.3, -.02, -.34]) { xf(q * .5, 1.06, z, _A); xf(q * .76, .62, z + .04, _K); xf(q * .62, .12, z + .1, _F); seg(MESH.cube, _A, _K, .08 * G5, .1 * G5, BONE); seg(MESH.cube, _K, _F, .07 * G5, .09 * G5, BONE); }
+    const bt = 1 + Math.pow(Math.max(0, Math.sin(g.t * 4)), 4) * .12; push(); T(0, .1, .66); draw(MESH.sph, .5 * G5 * bt, .42 * G5 * bt, .4 * G5 * bt, [.3, .45, .06], .5); pop(); xf(0, .1, .9, _B); glow(_B[0], _B[1], _B[2], 1.1 * G5, .6, .9, .15, .3); }
+  if (G6 > .02) { for (const q of [-1, 1]) { push(); T(q * .26, .26, .7); RY(q * (.25 + Math.abs(Math.sin(g.t * 2.4)) * .3)); RX(Math.PI / 2 + .35); SCL(G6); T(0, .28, 0); draw(MESH.cone, .15, .6, .12, BONE); pop(); }
+    for (let i = 0; i < 4; i++) { push(); T(-.2 - i * .13, .98 + (i % 2) * .09, .64); draw(MESH.sph, .1 * G6, .1 * G6, .08 * G6, [.75, 1, .2], 2.5); pop(); } }
   // right arm: the rotary gun. The barrels really turn and the whole gun kicks back on a spring.
   push(); T(-.98, .62, .12); RX(g.pitch.x); T(0, 0, -g.kick.x * .012);
     box(0, 0, .22, .36, .42, .78, DRK, -.6); box(0, .24, .2, .2, .08, .5, YEL2); push(); T(.02, -.04, -.26); RZ(Math.PI / 2); draw(MESH.cyl, .62, .3, .62, YEL2); pop(); box(.2, .0, .0, .1, .2, .5, BRASS, -.9);
     push(); T(0, -.02, .62); RZ(g.spin); for (let k = 0; k < 6; k++) { push(); RZ(k * TAU / 6); T(.1, 0, .46); RX(Math.PI / 2); draw(MESH.cyl, .065, .96, .065, STL, -.9); pop(); }
       for (const z of [.12, .55, .9]) { push(); T(0, 0, z); RX(Math.PI / 2); draw(MESH.cyl, .36, .06, .36, DRK, -.7); pop(); } pop();
+    if ((k = fitK(g, 'hot')) > 0) { for (const z of [1.0, 1.28]) { push(); T(0, -.02, z); RX(Math.PI / 2); draw(MESH.cyl, .46 * k, .1, .46 * k, [.5, .12, .03], .3 + g.heat * 2.2); pop(); } }       // heat collars that glow while the gun runs
+    if ((k = fitK(g, 'pierce')) > 0) { push(); T(0, -.3, .7); RX(Math.PI / 2); SCL(k); T(0, .75, 0); draw(MESH.cone, .13, 1.5, .13, BONE); pop(); }
     xf(0, -.02, 1.62, _B); g.muz[0] = _B[0] - g.x; g.muz[1] = _B[1]; g.muz[2] = _B[2] - g.z;
     if (g.flash > .05) { const f = g.flash; glow(_B[0], _B[1], _B[2], 1.5 * f + .3, 1, .8, .4, f); xfd(0, 0, 1, _F); sprite(PADD, _B[0] + _F[0] * .5, _B[1] + _F[1] * .5, _B[2] + _F[2] * .5, .22 * f, 0, _F[0] * .8, _F[1] * .8, _F[2] * .8, 1, .75, .35, f); }
   pop();
@@ -405,19 +465,19 @@ function drawMech(g) {
   xf(.98, .66, 0, _A); xf(lerp(1.06, .7, r), lerp(.16, .5, r), lerp(.12, .62, r) + sw, _K); xf(lerp(1.08, .05, r), lerp(.0, .52, r), lerp(.5, 1.28, r) + sw, _F);
   seg(MESH.cube, _A, _K, .26, .28, DRK, -.6); seg(MESH.cube, _K, _F, .22, .24, STL, -.7);
   push(); T(lerp(1.2, .0, r), lerp(.02, .5, r), lerp(.5, 1.4, r) + sw); RY(lerp(1.38, 0, r)); RX(lerp(0, -.12, r));
-    draw(MESH.cube, 1.36, 1.1, .13, YEL); box(0, .52, .03, 1.4, .1, .2, STL, -.8); box(0, -.52, .06, 1.4, .12, .26, STL, -.8); for (const k of [-.36, 0, .36]) { push(); T(k, 0, .07); RZ(.6); draw(MESH.cube, .13, 1.0, .02, DRK); pop(); } pop();
+    draw(MESH.cube, 1.36, 1.1, .13, YEL); box(0, .52, .03, 1.4, .1, .2, STL, -.8); box(0, -.52, .06, 1.4, .12, .26, STL, -.8); for (const q of [-.36, 0, .36]) { push(); T(q, 0, .07); RZ(.6); draw(MESH.cube, .13, 1.0, .02, DRK); pop(); } if ((k = fitK(g, 'chain')) > 0) for (const q of [-.44, 0, .44]) { push(); T(q, .24, .08); RX(Math.PI / 2); SCL(k); T(0, .26, 0); draw(MESH.cone, .2, .52, .2, BONE); pop(); } pop();
 }
-function drawBug(e, g) { const s = e.s, tell = e.state === 'tell', E = e.flash > 0 ? (ST.flash ? .3 : .8) : ST.contrast ? .35 : -.5, C = e.flash > 0 ? [.3, .2, .12] : ST.contrast ? [.3, .2, .34] : e.spit ? SPITC : CHIT, C2 = e.flash > 0 ? C : e.spit ? SPITC2 : CHIT2;
+function drawBug(e, g) { const al = e.ally, s = e.s * (al ? Math.min(1, e.born * 3) * Math.min(1, e.life * 3 + .2) : 1), tell = e.state === 'tell', E = e.flash > 0 ? (ST.flash ? .3 : .8) : ST.contrast ? .35 : -.5, C = e.flash > 0 ? [.3, .2, .12] : al ? ALLYC : ST.contrast ? [.3, .2, .34] : e.spit ? SPITC : CHIT, C2 = e.flash > 0 ? C : al ? ALLYC2 : e.spit ? SPITC2 : CHIT2;
   const by = (.5 + Math.sin(e.phase * TAU * 2) * .025 + e.rear.x * .1 + (e.state === 'lunge' ? .18 : 0)) * s, ca = Math.cos(e.a), sa = Math.sin(e.a);
-  decal(e.x, e.z, 1.0 * s, 1.35 * s, e.a, 0, 0, 0, 0, .5);
+  decal(e.x, e.z, 1.0 * s, 1.35 * s, e.a, 0, 0, 0, 0, .5); if (al) decal(e.x, e.z, 1.2 * s, 1.2 * s, 0, 1, .3, .85, 1, .5, .012);
   if (tell && e.spit) { const k = 1 - e.st / .75, hc = ST.contrast; decal(e.tx, e.tz, 1.9, 1.9, 0, 1, 1, hc ? .8 : .12, hc ? .6 : .05, (hc ? .6 : .4) + k * .4, .012); }
   else if (tell) { const k = 1 - e.st / (e.big ? .85 : TELL), hc = ST.contrast, LANE = e.big ? 10.8 : LUNGE_T * LUNGE_V + .8; decal(e.x + e.ldx * LANE / 2, e.z + e.ldz * LANE / 2, e.big ? 1.25 : .62, LANE / 2, e.la, 2, hc ? 1 : .95, hc ? .8 : .1, hc ? .6 : .04, (hc ? .5 : .3) + k * .4, .01); }
   reset(); T(e.x, by, e.z); RY(e.a); T(0, 0, -e.fl.x * .22); RX(-e.rear.x * .5 - e.fl.x * .12);
   draw(MESH.sph, .8 * s, .5 * s, .92 * s, C, E); push(); T(0, .2 * s, -.02 * s); RX(-.12); draw(MESH.cube, .52 * s, .14 * s, .74 * s, C2, E > 0 ? E : -.6); pop();
   if (e.spit) { push(); T(0, .34 * s, -.8 * s); RX(-.5 - e.rear.x * .4); const pu = 1 + (tell ? Math.sin(g.t * 30) * .06 + .12 : Math.sin(g.t * 3 + e.bias * 9) * .04); draw(MESH.sph, 1.05 * s * pu, .95 * s * pu, 1.3 * s * pu, [.6, .75, .1], e.flash > 0 ? E : tell ? 1.3 : .45); T(0, .2 * s, .5 * s); draw(MESH.cone, .3 * s, .5 * s, .3 * s, C2, E > 0 ? E : -.5); pop(); xf(0, .5 * s, -.9 * s, _B); glow(_B[0], _B[1], _B[2], (tell ? 2.2 : 1.4) * s, .7, .9, .15, tell ? .5 : .25); }       // the spitter is mostly a swollen acid sac
-  else { push(); T(0, .12 * s, -.86 * s); RX(.22 + Math.sin(g.t * 7 + e.bias * 9) * .05); draw(MESH.sph, .92 * s, .64 * s, 1.24 * s, C, E); for (const k of [-1, 1]) { push(); T(k * .3 * s, .16 * s, -.08 * s); draw(MESH.sph, .16 * s, .14 * s, .34 * s, ICH, 1.1 + Math.sin(g.t * 5 + e.bias * 20) * .4); pop(); } box(0, .26 * s, .12 * s, .5 * s, .1 * s, .4 * s, C2, E > 0 ? E : -.6); pop(); }
+  else { push(); T(0, .12 * s, -.86 * s); RX(.22 + Math.sin(g.t * 7 + e.bias * 9) * .05); draw(MESH.sph, .92 * s, .64 * s, 1.24 * s, C, E); for (const k of [-1, 1]) { push(); T(k * .3 * s, .16 * s, -.08 * s); draw(MESH.sph, .16 * s, .14 * s, .34 * s, al ? [.2, .8, 1] : ICH, 1.1 + Math.sin(g.t * 5 + e.bias * 20) * .4); pop(); } box(0, .26 * s, .12 * s, .5 * s, .1 * s, .4 * s, C2, E > 0 ? E : -.6); pop(); }
   push(); T(0, -.02 * s, .6 * s); RX(.25 - e.rear.x * .25); draw(MESH.sph, .54 * s, .42 * s, .58 * s, C, E);
-    for (const k of [-1, 1]) { push(); T(k * .17 * s, .09 * s, .2 * s); draw(MESH.sph, .14 * s, .12 * s, .14 * s, tell ? [1, .25, .1] : [.75, 1, .2], tell ? 4 : 2.5); pop(); xf(k * .17 * s, .09 * s, .24 * s, _B); glow(_B[0], _B[1], _B[2], (tell ? .7 : .38) * s, tell ? 1 : .6, tell ? .25 : 1, .15, .55);
+    for (const k of [-1, 1]) { push(); T(k * .17 * s, .09 * s, .2 * s); draw(MESH.sph, .14 * s, .12 * s, .14 * s, tell ? [1, .25, .1] : al ? [.3, .9, 1] : [.75, 1, .2], tell ? 4 : 2.5); pop(); xf(k * .17 * s, .09 * s, .24 * s, _B); glow(_B[0], _B[1], _B[2], (tell ? .7 : .38) * s, tell ? 1 : al ? .3 : .6, tell ? .25 : al ? .9 : 1, al ? 1 : .15, .55);
       push(); T(k * .13 * s, -.1 * s, .2 * s); RY(k * (.3 + (tell ? .5 : Math.abs(Math.sin(g.t * 9 + e.bias * 7)) * .25))); RX(Math.PI / 2); T(0, .22 * s, 0); draw(MESH.cone, .12 * s, .5 * s, .09 * s, BONE, 0); pop(); } pop();
   if (e.big) { box(0, .3 * s, -.02 * s, .7 * s, .12 * s, .9 * s, BONE, 0); box(0, .34 * s, -.8 * s, .62 * s, .1 * s, .8 * s, BONE, 0); for (const k of [-1, 1]) { push(); T(k * .34 * s, .3 * s, .2 * s); RZ(-k * .5); RX(-.5); T(0, .25 * s, 0); draw(MESH.cone, .16 * s, .6 * s, .16 * s, BONE, 0); pop(); } }       // the guard wears bone plates and horns
   if (e.burnT > 0) { glow(e.x, .9 * s, e.z, 1.3 * s, 1, .5, .12, .45); if (Math.random() < .5) part(0, e.x + rand(-.4, .4) * s, .7 * s, e.z + rand(-.4, .4) * s, 0, rand(1.5, 3), 0, .3, .4 * s, 1, .5, .1, .7, -1, .5, -.6); }
@@ -434,9 +494,10 @@ const SC = { cam: [0, 0, 0], at: [0, 0, 0], fov: .8, focus: [0, 0, 0], spotP: [0
 function shakeN(t, s) { const x = Math.sin(t * 12.9898 + s * 78.233) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; }
 function render() { const g = G; if (!GLOK) return; const fires = [];
   const cx = Math.floor(g.cam.x / CELL), cz = Math.floor(g.cam.z / CELL); for (let i = cx - 2; i <= cx + 2; i++) for (let j = cz - 3; j <= cz + 2; j++) for (const p of getCell(i, j)) { drawProp(p, g); if (p.k === 'fire') fires.push(p); }
-  drawMech(g); for (const e of g.en) drawBug(e, g);
+  drawMech(g); for (const e of g.en) drawBug(e, g); for (const e of g.allies) drawBug(e, g);
   for (const d of g.drops) { const y = .75 + Math.sin(d.t * 3) * .12, k = Math.min(1, d.t * 4) * Math.min(1, (45 - d.t) * .5), c = d.k === 'item' ? RAR[ITEM[d.id].r].col : [.3, 1, .5]; reset(); T(d.x, y, d.z); RY(d.t * 1.8); RX(.5);
     if (d.k === 'item') { draw(MESH.cube, .5 * k, .5 * k, .5 * k, DRK, -.8); draw(MESH.cube, .54 * k, .15 * k, .54 * k, c, 2.2); draw(MESH.cube, .15 * k, .54 * k, .54 * k, c, 2.2); } else draw(MESH.cyl, .32 * k, .5 * k, .32 * k, c, 1.6);
+    if (d.k === 'item' && ITEM[d.id].r === 'l') { sprite(PADD, d.x, 3.2, d.z, .5, 0, 0, 3, 0, c[0], c[1], c[2], .4 * k); glow(d.x, y, d.z, 3 + Math.sin(d.t * 5) * .4, c[0], c[1], c[2], .35 * k); }      // a legendary part stands in a column of light
     glow(d.x, y, d.z, (d.k === 'item' ? 1.9 : 1.2) * k, c[0], c[1], c[2], .45); decal(d.x, d.z, .95, .95, 0, 1, c[0], c[1], c[2], .55 * k, .01); decal(d.x, d.z, .5, .5, 0, 0, 0, 0, 0, .5 * k); }
   for (const sh of g.shells) { if (sh.t < 0) continue; const u = sh.t / sh.dur, x = lerp(sh.x0, sh.x1, u), y = lerp(sh.y0, .3, u) + Math.sin(u * Math.PI) * 6, z = lerp(sh.z0, sh.z1, u); reset(); T(x, y, z); draw(MESH.sph, .34, .34, .34, DRK, -.8); glow(x, y, z, .8, 1, .6, .2, .7); decal(sh.x1, sh.z1, 3.1, 3.1, 0, 1, 1, .65, .15, .25 + u * .45, .012); decal(x, z, .35, .35, 0, 0, 0, 0, 0, .4); }
   for (const b of g.bolts) { const a = Math.min(1, b.t / .08); for (let i = 1; i < b.pts.length; i++) { const A = b.pts[i - 1], B = b.pts[i]; let px = A[0], py = A[1], pz = A[2]; for (let k = 1; k <= 4; k++) { const u = k / 4, j = k < 4 ? .45 : 0, qx = lerp(A[0], B[0], u) + rand(-j, j), qy = lerp(A[1], B[1], u) + rand(-j, j), qz = lerp(A[2], B[2], u) + rand(-j, j); sprite(PADD, (px + qx) / 2, (py + qy) / 2, (pz + qz) / 2, .11, 0, (qx - px) / 2, (qy - py) / 2, (qz - pz) / 2, .6, .8, 1, a); px = qx; py = qy; pz = qz; } glow(B[0], B[1], B[2], 1.1, .5, .7, 1, .6 * a); } }
@@ -448,7 +509,7 @@ function render() { const g = G; if (!GLOK) return; const fires = [];
   for (const b of DB) { const k = Math.min(1, (b.life - b.t) * 3); reset(); T(b.x, b.y, b.z); RY(b.ay); RX(b.ax); draw(b.mesh, b.sx * k, b.sy * k, b.sz * k, b.col, b.e); }
   for (const d of DL) decal(d.x, d.z, d.sx, d.sz, d.rot, d.kind, d.r, d.g, d.b, d.a * Math.min(1, (d.life - d.t) * .6), 0, d.seed);
   for (const p of PT) { const f = 1 - p.t / p.life, s = Math.max(.01, p.size + p.grow * p.t); if (p.k === 1) sprite(PSMK, p.x, p.y, p.z, s, s, 0, 0, 0, p.r, p.g, p.b, p.a * f); else if (p.k === 2) sprite(PADD, p.x, p.y, p.z, s, 0, p.vx * p.len, p.vy * p.len, p.vz * p.len, p.r, p.g, p.b, p.a * f); else sprite(PADD, p.x, p.y, p.z, s, s, 0, 0, 0, p.r, p.g, p.b, p.a * f); }
-  for (const r of TR) { const u = r.t / r.dur, dx = r.x1 - r.x0, dy = r.y1 - r.y0, dz = r.z1 - r.z0, l = Math.hypot(dx, dy, dz) || 1, hl = Math.min(1.5, l * .3) / l; if (r.c) sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .06, 0, dx * hl, dy * hl, dz * hl, .3, .9, 1, 1); else sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .07, 0, dx * hl, dy * hl, dz * hl, 1, .85, .5, 1); }
+  for (const r of TR) { const u = r.t / r.dur, dx = r.x1 - r.x0, dy = r.y1 - r.y0, dz = r.z1 - r.z0, l = Math.hypot(dx, dy, dz) || 1, hl = Math.min(1.5, l * .3) / l; if (r.c === 2) sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .16, 0, dx * hl * .5, dy * hl * .5, dz * hl * .5, .7, .95, .15, 1); else if (r.c) sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .06, 0, dx * hl, dy * hl, dz * hl, .3, .9, 1, 1); else sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .07, 0, dx * hl, dy * hl, dz * hl, 1, .85, .5, 1); }
   // lights: the lamp, a soft fill so the mech never vanishes, then whatever is burning or firing
   const br = ST.bright + (ST.contrast ? .25 : 0), L = SC.lights; L.length = 0; const on = g.dead ? 0 : 1;
   L.push({ p: [g.x, 4.2, g.z + 1.5], c: [.3 * on + br * .5, .28 * on + br * .5, .27 * on + br * .55], r: 9 + br * 6 });
@@ -495,11 +556,11 @@ function show(id) {
   else if (document.activeElement && document.activeElement !== document.body) { try { document.activeElement.blur(); } catch (e) { } }
 }
 function startGame() { if (!GLOK) return; initAudio(); const cam = G ? G.cam : null; newGame(false); if (cam) G.cam.d = cam.d; state = 'play'; show(''); lastT = performance.now();
-  if (FOUND.length) equip(pick(FOUND), 'Carried over'); else announce('Run started. Drag to walk. The gun fires on its own.'); }      // one part you have found before comes with you
+  const carry = FOUND.filter(id => ITEM[id].r !== 'l'); if (carry.length) equip(pick(carry), 'Carried over'); else announce('Run started. Drag to walk. The gun fires on its own.'); }      // one part you have found before comes with you
 const partLi = id => { const it = ITEM[id], l = G.lv[id]; return `<li><b style="color:${RAR[it.r].css}">${it.n}</b> <span class="rr">${RAR[it.r].n}${it.max > 1 ? ' · ' + MK[l] : ''}</span><br>${it.d(l)}</li>`; };
 function nightUI() { const sel = $('night'); sel.innerHTML = ''; for (let i = 1; i <= OPEN; i++) { const o = document.createElement('option'); o.value = i; o.textContent = 'Night ' + i; if (i === night) o.selected = true; sel.appendChild(o); } $('nightSay').textContent = NIGHTS[night - 1].say + (OPEN < NIGHTS.length && night === OPEN ? ' Hold it to open night ' + (OPEN + 1) + '.' : ''); $('againBtn').textContent = 'Start night ' + night; $('startBtn').textContent = 'Start night ' + night; }
 $('night').addEventListener('change', e => { night = clamp(+e.target.value | 0, 1, OPEN); nightUI(); });
-function titleInfo() { nightUI(); let w = 0; try { w = +(localStorage.getItem('ll4_wins') || 0); } catch (e) { } $('found').textContent = (FOUND.length ? `Parts found: ${FOUND.length} of ${ITEMS.length}. One comes with you each run.` : 'You start bare. Bugs drop parts, and they bolt themselves on.') + (w ? ` Nights held: ${w}.` : ''); }
+function titleInfo() { nightUI(); let w = 0; try { w = +(localStorage.getItem('ll4_wins') || 0); } catch (e) { } $('found').textContent = (FOUND.length ? `Parts found: ${FOUND.length} of ${ITEMS.length}. One comes with you each run.` : 'You start bare. Bugs drop parts. Fit enough and the machine starts to change.') + (w ? ` Nights held: ${w}.` : ''); }
 function endGame(win) { const g = G; state = 'over'; stick = null; dbtn = null; cardQ.length = 0; const t = Math.min(g.t, RUN) / PACE; let best = 0, wins = 0; try { best = +(localStorage.getItem('ll4_best') || 0); wins = +(localStorage.getItem('ll4_wins') || 0); if (t > best) localStorage.setItem('ll4_best', Math.floor(t)); if (win) localStorage.setItem('ll4_wins', ++wins); } catch (e) { } $('overT').textContent = win ? 'Night ' + g.night + ' held' : 'Wrecked'; let opened = 0; if (win && g.night === OPEN && OPEN < NIGHTS.length) { OPEN++; opened = OPEN; night = OPEN; try { localStorage.setItem('ll4_night', OPEN); } catch (e) { } } else if (win && g.night < OPEN) night = g.night + 1;
   $('stats').innerHTML = (win ? 'Relief arrived. The pad held.<br>' : '') + (opened ? `<b>Night ${opened} is open.</b> ${NIGHTS[opened - 1].say}<br>` : '') + `Night ${g.night} · held for <b>${fmtT(t)}</b> of ${fmtT(RUN / PACE)}<br>Kills <b>${g.kills}</b><br>Best <b>${fmtT(Math.max(best, t))}</b>` + (wins ? ` · Nights held <b>${wins}</b>` : '') + `<br>Parts fitted <b>${g.parts}</b> · kinds found so far <b>${FOUND.length}</b> of ${ITEMS.length}` + (g.fresh.length ? `<br>New: <b>${g.fresh.map(id => ITEM[id].n).join(', ')}</b>` : ''); $('overParts').innerHTML = g.items.map(partLi).join(''); titleInfo(); announce($('overT').textContent + '. ' + $('stats').innerText.replace(/\n+/g, '. ')); show('over'); }
 function togglePause() { if (state === 'card') return; if (state === 'play') { state = 'paused'; stick = null; dbtn = null; $('build').innerHTML = G.items.length ? G.items.map(partLi).join('') : '<li>No parts fitted yet.</li>'; announce('Paused'); show('pause'); } else if (state === 'paused') { if (cardQ.length) openCard(); else { state = 'play'; show(''); lastT = performance.now(); } } }

@@ -34,7 +34,7 @@ The walker starts bare. Bugs drop a part roughly every twenty-odd seconds, and e
 
 The first time a part is fitted in a run, the game stops and shows a card with its icon, name and what it does. Finding the same part again raises its mark and shows a caption. Fitted parts sit in a row under the hull bar, with a pip per mark, and are listed with their effects on the pause and end screens.
 
-Rarity is the part's role: common parts tune what you have, rare parts are new weapons you can see firing, epic parts change a rule.
+Rarity is the part's role: common parts tune what you have, rare parts are new weapons you can see firing, epic parts change a rule, and legendary parts are alien organs with an effect nothing else has. Legendary parts have a single mark and cannot be raised. They do not appear before the first minute, sit in a column of gold light when dropped, and are more likely from a brood guard.
 
 | Part | Rarity | Marks | What it does |
 |---|---|---|---|
@@ -52,8 +52,19 @@ Rarity is the part's role: common parts tune what you have, rare parts are new w
 | Volatile Ichor | Epic | 2 | Bugs burst when they die and hurt their neighbours |
 | Ram Charger | Epic | 2 | A longer dash that recharges on ram kills; at mark two it ends in a slam |
 | Searing Lamp | Epic | 2 | A wider lamp that burns and slows every bug in its beam |
+| Brood Heart | Legendary | 1 | Some of the bugs you kill rise again and fight for you for a while; yours glow blue |
+| Titan Tendons | Legendary | 1 | Every footfall cracks the ground and hurts everything near that foot |
+| Reaper Limbs | Legendary | 1 | Two bone scythes grow from your back and sweep around you without stopping |
+| Second Shell | Legendary | 1 | Once a night, the hit that would wreck you sheds the shell instead: a blast, and half your hull back |
+| Spitter Graft | Legendary | 1 | A grown limb spits acid at a second target, and every hit splashes |
 
-The first part of a run is always a rare one. Kinds of part you have found are remembered on the device, and each new run starts with one of them, picked at random.
+The first part of a run is always a rare one. Kinds of part you have found are remembered on the device, and each new run starts with one of them, picked at random (never a legendary one).
+
+### The machine changes
+
+Every part shows on the walker: the mortar tube on the shoulder, a brass-wound coil with a lit ball, heat collars on the gun that glow while it fires, coolant pipes, a bone spike under the barrels, horns on the ram plate, the heart beating on its back, the scythe limbs, the pale second shell until it is shed. A new fitting pops out and settles.
+
+The parts come off bugs, and they take hold. The more you have fitted in a run, the more the walker grows over, in six stages (at 2, 4, 7, 10, 13 and 17 parts): chitin plates and cords of sinew, glowing sacs and knee spurs, shoulder carapace and a feeler, a ridge of spines and toe claws, ribs and a pulsing sac under the cab, and finally mandibles, a cluster of eyes and chitin legs.
 
 ## How it is drawn and animated
 

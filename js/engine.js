@@ -29,6 +29,7 @@ function T(x, y, z) { const m = STK[sp]; m[12] += m[0] * x + m[4] * y + m[8] * z
 function RY(a) { const m = STK[sp], c = Math.cos(a), s = Math.sin(a); for (let i = 0; i < 3; i++) { const x = m[i], z = m[8 + i]; m[i] = x * c - z * s; m[8 + i] = x * s + z * c; } }
 function RX(a) { const m = STK[sp], c = Math.cos(a), s = Math.sin(a); for (let i = 0; i < 3; i++) { const y = m[4 + i], z = m[8 + i]; m[4 + i] = y * c + z * s; m[8 + i] = -y * s + z * c; } }
 function RZ(a) { const m = STK[sp], c = Math.cos(a), s = Math.sin(a); for (let i = 0; i < 3; i++) { const x = m[i], y = m[4 + i]; m[i] = x * c + y * s; m[4 + i] = -x * s + y * c; } }
+function SCL(k) { const m = STK[sp]; for (let i = 0; i < 11; i++) if (i % 4 !== 3) m[i] *= k; }
 function xf(x, y, z, o) { const m = STK[sp]; o = o || [0, 0, 0]; o[0] = m[0] * x + m[4] * y + m[8] * z + m[12]; o[1] = m[1] * x + m[5] * y + m[9] * z + m[13]; o[2] = m[2] * x + m[6] * y + m[10] * z + m[14]; return o; }
 
 /* ---------- meshes ---------- */
