@@ -22,11 +22,49 @@ const M = [
   ['the camera is at 50 degrees', "? 46 : 38;", "? 46 : 50;", 'approved-slice-checks.js', 'Camera looks down at 38'],
   ['the walker casts its own lamp shadow again', 'shadowCut(); drawMech(g);', 'drawMech(g);', 'approved-slice-checks.js', 'no shadow of its own'],
 ];
-const run = (dir, suite) => { const r = spawnSync('node', [path.join(dir, 'tests', suite)], { encoding: 'utf8', timeout: 600000 }); return { output: (r.stdout || '') + (r.stderr || ''), status: r.status, error: r.error };  };
-const copy = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'lastlight-')); for (const f of fs.readdirSync(root)) { if (['.git', 'design', 'screenshots', 'node_modules'].includes(f)) continue; fs.cpSync(path.join(root, f), path.join(d, f), { recursive: true, filter: s => !s.includes(path.join('tests', 'out')) }); } return d; };
-const only = process.argv[2]; let missed = 0, bad = 0; const base = copy();
-for (const s of ['checks.js', 'approved-slice-checks.js', 'behaviour.js']) { const r = run(base, s), o = r.output, f = o.split('\n').filter(l => l.startsWith('FAIL')); console.log(`unbroken  ${s.padEnd(26)} ${f.length ? 'FAILS ' + f.join(' | ') : 'all pass'}`); if (f.length || r.status !== 0 || r.error || !/PASS /m.test(o)) { bad++; console.error('Baseline did not complete successfully:', r.status, r.error || '', o.slice(-1000)); } }
-for (const [name, find, repl, suite, expect] of M) { if (only && !name.includes(only)) continue; const d = copy(), p = path.join(d, 'js', 'game.js'), src = fs.readFileSync(p, 'utf8'); if (src.split(find).length !== 2) { console.log(`STALE     ${name}: the line to break was not found exactly once`); bad++; continue; }
-  fs.writeFileSync(p, src.replace(find, repl)); const r = run(d, suite), o = r.output, fails = o.split('\n').filter(l => l.startsWith('FAIL')), caught = r.status === 1 && !r.error && fails.some(l => l.includes(expect)); if (!caught) missed++;
-  console.log(`${caught ? 'CAUGHT   ' : 'MISSED   '} ${name}  ->  ${suite}: ${caught ? fails.find(l => l.includes(expect)).slice(0, 110) : fails.length ? 'other tests failed: ' + fails.map(l => l.slice(5, 60)).join(' | ') : 'nothing failed'}`); fs.rmSync(d, { recursive: true, force: true }); }
-fs.rmSync(base, { recursive: true, force: true }); console.log(`${M.length - missed - bad} caught, ${missed} missed, ${bad} problems`); process.exitCode = missed || bad ? 1 : 0;
+const run = (dir, suite) => spawnSync(process.execPath, [path.join(dir, 'tests', suite)], {
+  encoding: 'utf8', timeout: 600000
+});
+const output = r => (r.stdout || '') + (r.stderr || '');
+const copy = () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'lastlight-'));
+  for (const f of fs.readdirSync(root)) {
+    if (['.git', 'design', 'screenshots', 'node_modules'].includes(f)) continue;
+    fs.cpSync(path.join(root, f), path.join(d, f), {
+      recursive: true, filter: s => !s.includes(path.join('tests', 'out'))
+    });
+  }
+  return d;
+};
+const only = process.argv[2], selected = M.filter(([name]) => !only || name.includes(only));
+if (!selected.length) throw new Error('No mutants match: ' + only);
+let missed = 0, bad = 0, caughtCount = 0;
+const base = copy();
+try {
+  for (const suite of ['checks.js', 'approved-slice-checks.js', 'behaviour.js']) {
+    const r = run(base, suite), o = output(r), fails = o.split('\n').filter(l => l.startsWith('FAIL'));
+    const passed = r.status === 0 && !r.error && !fails.length && /^PASS /m.test(o);
+    console.log(`unbroken  ${suite.padEnd(26)} ${passed ? 'all pass' : 'BASELINE FAILED'}`);
+    if (!passed) { bad++; console.error('exit:', r.status, r.error || '', o.slice(-1000)); }
+  }
+} finally { fs.rmSync(base, { recursive: true, force: true }); }
+if (bad) {
+  console.error('Mutation run aborted: an unbroken baseline did not pass.');
+  process.exit(1);
+}
+for (const [name, find, repl, suite, expect] of selected) {
+  const d = copy();
+  try {
+    const p = path.join(d, 'js', 'game.js'), src = fs.readFileSync(p, 'utf8');
+    if (src.split(find).length !== 2) {
+      console.log(`STALE     ${name}: the line to break was not found exactly once`); bad++; continue;
+    }
+    fs.writeFileSync(p, src.replace(find, repl));
+    const r = run(d, suite), fails = output(r).split('\n').filter(l => l.startsWith('FAIL'));
+    const caught = r.status === 1 && !r.error && fails.some(l => l.includes(expect));
+    if (caught) caughtCount++; else missed++;
+    console.log(`${caught ? 'CAUGHT   ' : 'MISSED   '} ${name} -> ${suite}: ${caught ? fails.find(l => l.includes(expect)).slice(0, 110) : 'expected failure absent; exit ' + r.status}`);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+}
+console.log(`${caughtCount} caught, ${missed} missed, ${bad} problems (${selected.length} selected)`);
+process.exitCode = missed || bad ? 1 : 0;
