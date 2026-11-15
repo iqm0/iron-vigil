@@ -101,8 +101,13 @@ layout(location=0) in vec2 aP; uniform mat4 uVP; uniform vec3 uCenter; out vec3 
 void main() { vP = vec3(aP.x * 90. + uCenter.x, 0., aP.y * 90. + uCenter.z); gl_Position = uVP * vec4(vP, 1.); }`;
 const FS_GROUND = `#version 300 es
 ${GLSL_LIGHT}
-uniform sampler2D uGA, uGN; in vec3 vP; out vec4 o;
-void main() { vec2 uv = vP.xz / ${GT}.; vec4 a = texture(uGA, uv); vec2 n = texture(uGN, uv).rg * 2. - 1.; vec3 N = normalize(vec3(n.x, 1., n.y)); o = vec4(finish(lightAll(vP, N, a.rgb * a.rgb, a.a), vP), 1.); }`;
+uniform sampler2D uGA, uGN; uniform vec4 uYard; in vec3 vP; out vec4 o;
+void main() { vec2 uv = vP.xz / ${GT}.; vec4 a = texture(uGA, uv); vec2 n = texture(uGN, uv).rg * 2. - 1.; vec3 alb = a.rgb * a.rgb; float sp = a.a;
+  /* inside the fence it is concrete with a worn painted border; outside it is ploughed soil, furrows running north to south */
+  float d = max(max(uYard.x - vP.x, vP.x - uYard.y), max(uYard.z - vP.z, vP.z - uYard.w)), soil = smoothstep(.2, 1.1, d + (a.r - .3) * 1.2), fur = sin(vP.x * 3.9 + sin(vP.z * .21) * .7);
+  float line = (1. - smoothstep(.07, .13, abs(d + 1.1))) * step(.22, a.g) * (1. - soil); alb = mix(alb, vec3(.5, .36, .06), line * .55);
+  alb = mix(alb, vec3(.03, .021, .013) * (.6 + .5 * a.r) * (.75 + .25 * fur), soil); sp = mix(sp, .02, soil); n = mix(n, vec2(-cos(vP.x * 3.9 + sin(vP.z * .21) * .7) * .55, n.y * .5), soil);
+  vec3 N = normalize(vec3(n.x, 1., n.y)); o = vec4(finish(lightAll(vP, N, alb, sp), vP), 1.); }`;
 /* the ground is painted once into a repeating texture, so the per-frame cost is two lookups */
 const VS_BAKE = `#version 300 es
 layout(location=0) in vec2 aP; out vec2 vU; void main() { vU = aP * .5 + .5; gl_Position = vec4(aP, 0., 1.); }`;
@@ -216,7 +221,7 @@ function renderScene(S, W, H) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shadowTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texGA); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texGN); gl.activeTexture(gl.TEXTURE0);
-  gl.useProgram(PROG.ground); setLightUniforms(PROG.ground, S); gl.uniform1i(PROG.ground.u.uGA, 1); gl.uniform1i(PROG.ground.u.uGN, 2); gl.uniform3fv(PROG.ground.u.uCenter, S.focus); gl.bindVertexArray(groundVAO); gl.disable(gl.CULL_FACE); gl.drawArrays(gl.TRIANGLES, 0, 6);
+  gl.useProgram(PROG.ground); setLightUniforms(PROG.ground, S); gl.uniform1i(PROG.ground.u.uGA, 1); gl.uniform1i(PROG.ground.u.uGN, 2); gl.uniform3fv(PROG.ground.u.uCenter, S.focus); gl.uniform4fv(PROG.ground.u.uYard, S.yard || [-1e4, 1e4, -1e4, 1e4]); gl.bindVertexArray(groundVAO); gl.disable(gl.CULL_FACE); gl.drawArrays(gl.TRIANGLES, 0, 6);
   // decals lie on the ground: contact shadows, splats, attack marks
   if (DEC.n) { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.useProgram(PROG.decal); gl.uniformMatrix4fv(PROG.decal.u.uVP, false, VP); gl.bindVertexArray(DEC.vao); gl.bindBuffer(gl.ARRAY_BUFFER, DEC.buf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, DEC.data, 0, DEC.n * 12); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, DEC.n); gl.depthMask(true); gl.disable(gl.BLEND); }
   gl.enable(gl.CULL_FACE); gl.useProgram(PROG.lit); setLightUniforms(PROG.lit, S); for (const m of meshes) if (m.n) { gl.bindVertexArray(m.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, m.count, m.n); }

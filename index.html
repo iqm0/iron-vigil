@@ -36,16 +36,21 @@ button:disabled{opacity:.5;cursor:default}
 #stats b{color:var(--amber);font-weight:600}
 .parts{width:min(400px,100%);text-align:left;margin:6px 0 14px;color:var(--bone);font-size:.98rem;line-height:1.35}
 .parts li{list-style:none;padding:8px 0;border-top:1px solid rgba(107,90,42,.5)}
-#part{background:rgba(0,0,0,.74)}
-#partI{position:static;transform:none;width:120px;height:120px;margin:4px 0 12px}
-#partD{font-size:1.25rem;line-height:1.4;max-width:330px;margin:4px 0 12px;color:#fff}
-#partR{font-weight:700}
-#overParts{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;max-width:360px;margin:0 0 16px}
-#overParts canvas{position:static;transform:none;width:44px;height:44px}
-#partD{margin-bottom:20px}
+#choose{background:rgba(0,0,0,.8);justify-content:center}
+#choose h2{font-size:min(7.5vw,1.9rem);margin-bottom:2px}
+#chSub{font-size:1rem;color:var(--bone);margin:0 0 12px}
+.opt{display:grid;grid-template-columns:48px 1fr;column-gap:12px;align-items:start;width:min(430px,100%);margin:6px 0;padding:12px 14px;text-align:left;text-transform:none;letter-spacing:0;font-weight:400;color:var(--bone);border:2px solid var(--amber);background:rgba(20,16,8,.96);min-height:132px}
+.opt canvas{position:static;transform:none;width:48px;height:48px;grid-row:1/span 4}
+.opt .nm{font-size:1.16rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);line-height:1.15;margin-bottom:4px}
+.opt .does{font-size:1.02rem;line-height:1.3;color:#fff;margin-bottom:6px}
+.opt .ln{font-size:.92rem;line-height:1.3;color:var(--bone)}
+.opt .ln i{font-style:normal;font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-right:6px}
+.opt .ln.c i{color:#ff9a7a}
+#choose.org .opt{border-color:#b6e04a}
+#choose.org .opt .nm,#choose.org h2{color:#b6e04a}
+.parts b{color:var(--amber)}
+.parts b.org{color:#b6e04a}
 .parts .rr{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-#night{min-height:44px;font:inherit;font-size:1rem;font-weight:600;background:#14110a;color:var(--amber);border:1px solid var(--line);padding:6px 12px;margin:2px 0 6px}
-#nightSay{font-size:.92rem;line-height:1.35;color:var(--bone);max-width:330px;margin:0 auto 10px}
 #found{letter-spacing:.06em;text-transform:none;font-size:.9rem;max-width:330px}
 #setBody{width:min(460px,100%);text-align:left;margin:10px 0 14px}
 #setBody fieldset{border:1px solid var(--line);margin:0 0 14px;padding:10px 14px 6px}
@@ -68,7 +73,7 @@ button:disabled{opacity:.5;cursor:default}
 </head>
 <body>
 <main id="app">
-<canvas id="gl" role="img" aria-label="Game view. A walking machine with a headlamp and a heavy three-barrel cannon fights large insects on a dark concrete pad. Events and results are announced as text."></canvas>
+<canvas id="gl" role="img" aria-label="Game view. A walking machine with a headlamp and a heavy cannon defends a farm power relay from large insects at night. Events, choices and results are announced as text."></canvas>
 <canvas id="c" aria-hidden="true"></canvas>
 <div id="live" class="sr" aria-live="polite" aria-atomic="true"></div>
 <noscript><p style="padding:2rem">Last Light needs JavaScript to run.</p></noscript>
@@ -77,17 +82,15 @@ button:disabled{opacity:.5;cursor:default}
 
 <div class="scr on" id="title">
   <div>
-    <p class="tag">Night shift, pad nine</p>
+    <p class="tag">Farm relay 09 · night shift</p>
     <h1>Last<br>Light</h1>
   </div>
   <div>
     <ul class="how" id="howTo">
-      <li>Drag to walk; the cannon aims itself. Hold out five minutes, then kill what comes.</li>
-      <li>Dash to ram through. Red on the ground is about to hurt.</li>
+      <li>Drag to walk; the cannon aims itself. Hold the relay for three minutes, then kill what comes.</li>
+      <li>Dash to ram: it staggers the big ones and caves in burrows. Red on the ground is about to hurt.</li>
     </ul>
     <p class="tag" id="found"></p>
-    <p class="nightRow"><label for="night" class="sr">Night</label><select id="night"></select></p>
-    <p id="nightSay"></p>
     <button id="startBtn" class="go" data-autofocus>Start</button><br>
     <button id="setBtn1" class="alt">Settings &amp; accessibility</button>
   </div>
@@ -95,7 +98,7 @@ button:disabled{opacity:.5;cursor:default}
 
 <div class="scr top" id="pause" role="dialog" aria-modal="true" aria-labelledby="pauseT">
   <h2 id="pauseT">Paused</h2>
-  <ul id="build" class="parts" aria-label="Fitted parts"></ul>
+  <ul id="build" class="parts" aria-label="Fitted modules"></ul>
   <button id="resumeBtn" class="go" data-autofocus>Resume</button>
   <button id="setBtn2" class="alt">Settings &amp; accessibility</button>
   <button id="quitBtn" class="alt">End run</button>
@@ -112,17 +115,28 @@ button:disabled{opacity:.5;cursor:default}
 <div class="scr top" id="over" role="dialog" aria-modal="true" aria-labelledby="overT">
   <h2 id="overT">Wrecked</h2>
   <div id="stats"></div>
-  <div id="overParts" role="group" aria-label="Parts fitted this run"></div>
   <button id="againBtn" class="go" data-autofocus>Again</button>
   <button id="setBtn3" class="alt">Settings &amp; accessibility</button>
 </div>
 
-<div class="scr" id="part" role="dialog" aria-modal="true" aria-labelledby="partN" aria-describedby="partD">
-  <p class="tag" id="partR">Part fitted</p>
-  <canvas id="partI" width="192" height="192" aria-hidden="true"></canvas>
-  <h2 id="partN">Part</h2>
-  <p id="partD"></p>
-  <button id="partOk" class="go">Continue</button>
+<div class="scr" id="choose" role="dialog" aria-modal="true" aria-labelledby="chT" aria-describedby="chSub">
+  <h2 id="chT">Salvage</h2>
+  <p id="chSub">Fit one. The other is gone.</p>
+  <button class="opt" id="ch0">
+    <canvas width="96" height="96" aria-hidden="true"></canvas>
+    <span class="nm"></span>
+    <span class="does"></span>
+    <span class="ln"><i>Best against</i><span class="best"></span></span>
+    <span class="ln c"><i>Cost</i><span class="cost"></span></span>
+  </button>
+  <button class="opt" id="ch1">
+    <canvas width="96" height="96" aria-hidden="true"></canvas>
+    <span class="nm"></span>
+    <span class="does"></span>
+    <span class="ln"><i>Best against</i><span class="best"></span></span>
+    <span class="ln c"><i>Cost</i><span class="cost"></span></span>
+  </button>
+  <button id="chNo" class="alt" hidden>Leave it</button>
 </div>
 
 <div class="scr" id="nogl" role="alertdialog" aria-labelledby="noglT">
