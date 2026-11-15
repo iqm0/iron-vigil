@@ -1,13 +1,14 @@
 # Last Light
 
-A portrait, one-thumb survivors game in real 3D. You drive a yellow scrap walker with a work lamp, a heavy three-barrel cannon and a ram plate, on a dark concrete pad full of large bugs. Runs last until the hull gives out.
+A portrait, one-thumb survivors game in real 3D. You drive a yellow scrap walker with a work lamp, a heavy three-barrel cannon and a ram plate, on a dark concrete pad full of large bugs. A night lasts five minutes, then the brood mother comes and you have to kill her.
 
 Static site, no build step and no libraries: `index.html`, `js/engine.js` (a small WebGL2 renderer) and `js/game.js`. Add `?fps` to the URL for a frame counter.
 
 ## How it plays
 
-- **Hold the pad for six minutes**, until relief arrives. The clock at the top counts down. Holding a night opens the next one.
-- **Drag anywhere** to walk. The cannon picks its own targets and fires while you move: the torso turns to the target on its own ring while the legs go where your thumb says. It fires three heavy shells a second and reaches about as far as the lamp shows, so bugs come into view and close in before they die. A shell kills the first bugs outright, tears a leg off one it does not kill, and carries on through into the next bug with a third less force. Its weight is shown on the walker and on the bugs; it does not shake the screen.
+- **Hold out for five minutes**; the clock at the top counts down to the brood mother. **Kill her** to end the night. Holding a night opens the next one.
+- **The brood mother** has four attacks, each marked on the ground before it lands: a charge down a wide lane, a volley of acid rings, a slam ring around her, and a clutch of stalkers from her brood sac. She speeds up below half health. Her health is the red bar at the top.
+- **Drag anywhere** to walk. The cannon picks its own targets and fires while you move: the torso turns to the target on its own ring while the legs go where your thumb says. It sits on its own pivot at the shoulder and lays itself on the target, so a shell always leaves straight along the barrel. It fires three heavy shells a second and reaches about as far as the lamp shows, so bugs come into view and close in before they die. A shell kills the first bugs outright, tears a leg off one it does not kill, and carries on through into the next bug with a third less force. Its weight is shown on the walker and on the bugs; it does not shake the screen.
 - **Dash** with the button (tap it, or drag it to aim). The thrusters fire, the ram plate comes forward, and anything in the way is thrown aside. You cannot be hurt during the burst.
 - **A red lane on the ground is a lunge about to land.** A bug rears up, the lane shows where it will go, and half a second later it leaps. Lunges are aimed at where you are heading, so change direction or dash across. Amber rings are your own mortar shells coming down.
 - **A red ring is acid about to land** (from night two). Spitters keep their distance and lob it at where you are heading; the pool stays for a few seconds.
@@ -72,13 +73,17 @@ Rarity is the part's role: common parts tune what you have, rare parts are new w
 | Second Shell | Legendary | 1 | Once a night, the hit that would wreck you sheds the shell instead: a blast, and half your hull back |
 | Spitter Graft | Legendary | 1 | A grown limb spits acid at a second target, and every hit splashes |
 
-The first part of a run is always a rare one. Kinds of part you have found are remembered on the device, and each new run starts with one of them, picked at random (never a legendary one).
+The first part of a run is always a rare one. Kinds of part you have found are remembered on the device. Every night starts bare.
 
 ### The machine changes
 
-Every part shows on the walker: the mortar tube on the shoulder, a brass-wound coil with a lit ball, heat collars on the gun that glow while it fires, coolant pipes, a bone spike under the barrels, horns on the ram plate, the heart beating on its back, the scythe limbs, the pale second shell until it is shed. A new fitting pops out and settles.
+The walker starts as a bare frame: a cab on legs with a cannon, an open steel ram frame, no plating.
 
-The parts come off bugs, and they take hold. The more you have fitted in a run, the more the walker grows over, in six stages (at 2, 4, 7, 10, 13 and 17 parts): chitin plates and cords of sinew, glowing sacs and knee spurs, shoulder carapace and a feeler, a ridge of spines and toe claws, ribs and a pulsing sac under the cab, and finally mandibles, a cluster of eyes and chitin legs.
+Every part shows on it: the mortar tube on the shoulder, a brass-wound coil with a lit ball, heat collars on the gun that glow while it fires, coolant pipes, a bone spike under the barrels, horns on the ram, the heart beating on its back, the scythe limbs, the pale second shell until it is shed. A new fitting pops out and settles.
+
+The parts come off bugs, and they take hold. The more you have fitted in a night, the more the walker is overgrown, in six stages (at 2, 4, 7, 10, 13 and 17 parts): a chitin shield across the ram frame, plates and cords of sinew; glowing sacs, shin guards and knee spurs; shoulder carapace and a feeler; a ridge of spines, toe claws and a swaying tail; ribs, a pulsing sac under the cab and two small grasping arms; and finally mandibles, a cluster of eyes, chitin legs and a spined hump. The torso swells a little with each stage.
+
+The brood mother is what keeps all of it alive. When she dies, the chitin, the sacs and the organs die with her and fall off, and what is left standing in the lamp is the bare machine again.
 
 ## How it is drawn and animated
 
@@ -107,7 +112,7 @@ Not done: the action itself is visual and is not playable by screen reader; ther
 
 Checked in headless Chromium only, by stepping the game and looking at frames, and by scripted players. It has not been run on a phone, so frame rate on real devices is unknown.
 
-Night one has been finished once by a person. Nights two to five are tuned against scripted players only, which are a poor guide: they finish nights one to three most of the time and are hit more on each.
+Night one, in an earlier form without the brood mother, has been finished once by a person. Nights two to five are tuned against scripted players only, which are a poor guide: they finish nights one to three most of the time and are hit more on each.
 
 `window.advanceTime(ms)` and `window.render_game_to_text()` exist for automated checks. Skills used while designing this are in [`.claude/skills/`](.claude/skills/README.md).
 
