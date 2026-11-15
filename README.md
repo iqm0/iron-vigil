@@ -70,6 +70,8 @@ The parts come off bugs, and they take hold. The more you have fitted in a run, 
 
 - Everything solid is an instance of one of four meshes (bevelled box, cylinder, cone, sphere), lit per pixel. The work lamp is a real spotlight with a shadow map; fires, the gun and the thrusters are point lights.
 - The whole game runs at nine tenths speed. The torso snaps to a target quickly, but the lamp is on its own swivel and swings round slowly, so the light does not whip about.
+- The pad is close to black outside the lamp, the fires and whatever is firing; bugs in the dark show as eyes. The *Darkness brightness* setting lifts it.
+- Every action fires several kinds of feedback at once. The gun heats its barrels, kicks, throws a flash that turns from shot to shot, and smokes as it cools; shots spray ichor out the far side. Footfalls leave prints and a chuff from the stacks. A hit throws plates off, sends arcs over the hull and dips the lamp, and a damaged hull smokes, sparks and then burns. Explosions throw a ring, smoke and chips of the pad.
 - Nothing is keyframed. Feet are planted on the ground and step when the body has moved far enough; knees are solved to reach them. Lean, recoil, the gun's kick, the ram arm and the antenna are springs. Bugs walk on two alternating tripods of legs the same way.
 - The ground texture is painted once at start-up, so each frame costs two texture lookups for it.
 - The 3D view is capped at 1.5 million pixels and drops its resolution, never its frame rate, if the device falls behind.

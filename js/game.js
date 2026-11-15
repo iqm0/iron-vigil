@@ -114,7 +114,7 @@ const baseStats = () => ({ dmg: 12, rate: 9.5, range: 16, speed: 6.4, dashCd: 1.
 function recalc(g) { const s = baseStats(); for (const id of g.items) ITEM[id].f(s, g.lv[id]); g.s = s; }
 const cardQ = []; let cardAt = 0;
 function equip(id, how) { const g = G, it = ITEM[id], first = !g.lv[id]; if (g.lv[id] >= it.max) { g.hp = Math.min(g.s.maxhp, g.hp + 15); sfx.repair(); return; }      // already at its top mark: it is scrap, and scrap mends the hull
-  if (first) { g.items.push(id); g.lv[id] = 1; } else g.lv[id]++; const l = g.lv[id]; recalc(g); g.itemFx = 1; g.itemCol = RAR[it.r].col; g.parts++; g.fitT[id] = g.t;
+  if (first) { g.items.push(id); g.lv[id] = 1; } else g.lv[id]++; const l = g.lv[id]; recalc(g); g.itemFx = 1; g.itemCol = RAR[it.r].col; g.parts++; g.fitT[id] = g.t; g.weldT = .8; g.crouch.v += 4.5;
   let fresh = false; if (!FOUND.includes(id)) { FOUND.push(id); fresh = true; try { localStorage.setItem('ll4_found', JSON.stringify(FOUND)); } catch (e) { } g.fresh.push(id); }
   sfx.item(it.r); const line = it.n + (it.max > 1 ? ', ' + MK[l] : '') + '. ' + it.d(l);
   if (first && !how && ST.cards) { cardQ.push({ id, l, fresh }); if (state === 'play') openCard(); } else cap((how ? how + ': ' : '') + line, 4.5); }     // a part you have not had this run stops the game so you can read it; a higher mark is a caption
@@ -150,7 +150,9 @@ function inBeam(g, x, z) { const dx = x - g.x, dz = z - g.z, d = Math.hypot(dx, 
 function blast(x, z, r, dmg, col) { const g = G; g.blasts.push({ x, z, r, dmg, col: col || [1, .55, .15], t: .07 }); }       // goes off a moment later, so chains ripple instead of all landing at once
 function doBlast(b) { const g = G; for (const e of g.en) { if (e.dead) continue; const dx = e.x - b.x, dz = e.z - b.z, d = Math.hypot(dx, dz) || 1; if (d < b.r + .5 * e.s) { e.kx += dx / d * 7; e.kz += dz / d * 7; hurtBug(e, b.dmg, dx / d, dz / d); } }
   const c = b.col; for (let i = 0; i < 9; i++) { const a = rand(0, TAU), v = rand(1, 5); part(0, b.x, rand(.4, 1), b.z, Math.sin(a) * v, rand(.5, 3), Math.cos(a) * v, rand(.2, .4), b.r * rand(.35, .6), c[0], c[1], c[2], .8, 0, 3, -1); } sparks(b.x, .6, b.z, 0, 0, 8, c[0], c[1], c[2], 9); mark(b.x, b.z, b.r * .8, b.r * .8, 0, 0, 0, 0, 0, .5, 8);
-  g.pulse = { x: b.x, z: b.z, c, t: 1 }; g.trauma = Math.min(1, g.trauma + .1); sfx.blast(); }
+  DL.push({ x: b.x, z: b.z, sx: .4, sz: .4, rot: 0, kind: 1, r: c[0], g: c[1], b: c[2], a: .85, t: 0, life: .26, seed: 0, grow: b.r * 5 }); for (let i = 0; i < 3; i++) part(1, b.x + rand(-.5, .5) * b.r * .4, rand(.4, .9), b.z + rand(-.5, .5) * b.r * .4, rand(-.6, .6), rand(1, 2.2), rand(-.6, .6), rand(.8, 1.3), b.r * .3, .13, .12, .11, .4, 0, 1.2, b.r * .5);
+  if (DB.length < 110) for (let i = 0; i < 3; i++) { const a = rand(0, TAU), v = rand(3, 7), sz = rand(.1, .24); debris(MESH.cube, b.x, .2, b.z, sz, sz * .6, sz, CONC, 0, Math.sin(a) * v, rand(5, 10), Math.cos(a) * v, rand(1.4, 2.2)); }
+  g.pulse = { x: b.x, z: b.z, c, t: 1 }; g.trauma = Math.min(1, g.trauma + .04 + b.r * .035); sfx.blast(); }
 
 /* ---------- nights: holding one opens the next, and each names what it adds ---------- */
 const NIGHTS = [
@@ -171,7 +173,7 @@ function newGame(demo) {
     bob: S0(), lx: S0(), lz: S0(), roll: S0(), rec: S0(), kick: S0(), ram: S0(), crouch: S0(), antx: S0(), antz: S0(), fov: S0(), pitch: S0(),
     spin: 0, spinV: 0, fireT: 0, flash: 0, heat: 0, jet: 0, tgt: null, dash: null, dcd: 0, inv: 0, hurtT: 0, sinceHit: 9, trauma: 0, freeze: 0, boom: 0, dead: 0, smokeT: 0,
     cam: { x: 0, z: 0, d: demo ? .5 : 1 }, en: [], spawnT: 1.2, cap: null, muz: [-.6, 2.3, 1.7], lampP: [0, 2.9, 1], lampD: [0, -.2, 1],
-    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, allies: [], fitT: {}, gr: [0, 1, 2, 3, 4, 5, 6].map(S0), stage: 0, reapA: 0, graftT: 0, graftP: [0, 3, 0], molted: false, stompFx: 0, s: baseStats() };
+    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, allies: [], fitT: {}, gr: [0, 1, 2, 3, 4, 5, 6].map(S0), stage: 0, reapA: 0, graftT: 0, graftP: [0, 3, 0], molted: false, stompFx: 0, hot: 0, shotN2: 0, fRot: 0, arcT: 0, weldT: 0, dip: 0, puffCd: 0, aimLean: 0, s: baseStats() };
   if (demo) { G.feet[0].x = Math.cos(.55) * HIPW; G.feet[0].z = -Math.sin(.55) * HIPW; G.feet[1].x = -G.feet[0].x; G.feet[1].z = -G.feet[0].z; G.feet[0].a = G.feet[1].a = .55; }
   PT.length = DB.length = DL.length = TR.length = 0; cardQ.length = 0;
 }
@@ -188,7 +190,7 @@ function pushOut(o, rad) { const cx = Math.floor(o.x / CELL), cz = Math.floor(o.
 /* ---------- small things that fly ---------- */
 function part(k, x, y, z, vx, vy, vz, life, size, r, g, b, a, grav, drag, grow, len) { if (PT.length < 650) PT.push({ k, x, y, z, vx, vy, vz, t: 0, life, size, r, g, b, a, grav: grav || 0, drag: drag || 0, grow: grow || 0, len: len || 0 }); }
 function debris(mesh, x, y, z, sx, sy, sz, col, e, vx, vy, vz, life) { if (DB.length > 170) DB.shift(); DB.push({ mesh, x, y, z, sx, sy, sz, col, e, vx, vy, vz, ax: rand(0, TAU), ay: rand(0, TAU), wx: rand(-14, 14), wy: rand(-14, 14), t: 0, life, rad: Math.max(.04, Math.min(sx, sy, sz) * .5) }); }
-function mark(x, z, sx, sz, rot, kind, r, g, b, a, life, seed) { if (DL.length > 80) DL.shift(); DL.push({ x, z, sx, sz, rot, kind, r, g, b, a, t: 0, life, seed: seed || 0 }); }
+function mark(x, z, sx, sz, rot, kind, r, g, b, a, life, seed) { if (DL.length > 130) DL.shift(); DL.push({ x, z, sx, sz, rot, kind, r, g, b, a, t: 0, life, seed: seed || 0 }); }
 function sparks(x, y, z, dx, dz, n, r, g, b, spd) { for (let i = 0; i < n; i++) { const a = Math.atan2(dx, dz) + rand(-.9, .9), s = rand(.3, 1) * (spd || 9); part(2, x, y, z, Math.sin(a) * s, rand(1, 6), Math.cos(a) * s, rand(.12, .3), .05, r, g, b, 1, 22, 2, 0, .035); } }
 function dust(x, z, n, spd, sz) { for (let i = 0; i < n; i++) { const a = rand(0, TAU), s = rand(.3, 1) * spd; part(1, x, rand(.1, .3), z, Math.sin(a) * s, rand(.3, 1.4), Math.cos(a) * s, rand(.5, 1), sz || .35, .2, .19, .17, .3, 0, 2.5, 1.3); } }
 
@@ -206,14 +208,17 @@ function spawnLogic(dt) { const g = G; if (g.demo || g.dead || g.won) return; co
   g.eliteT -= dt; if (g.eliteT <= 0) { g.eliteT = nt.guard; const a = rand(0, TAU), two = g.t > nt.pair; ring(a, 21, 'big'); if (two) ring(a + 2.4, 21, 'big'); cap((two ? 'Two brood guards. They carry parts.' : 'Brood guard from the ' + compass(a) + '. It carries a part.')); sfx.swarm(); }
   if (last && !g.lastSaid) { g.lastSaid = true; cap('Last push.'); } }
 function hurtBug(e, dmg, dx, dz, ram) { const g = G; if (e.dead) return; e.hp -= dmg; e.flash = .09; e.fl.v += (ram ? 16 : 7) * (e.big ? .4 : 1); const kb = (ram ? 24 : 2.6) * (e.big ? .2 : 1); e.kx += dx * kb; e.kz += dz * kb;
-  sparks(e.x - dx * .3, .55, e.z - dz * .3, -dx, -dz, ram ? 10 : 3, .7, 1, .25, 8); sfx.hit(); if (e.hp <= 0) killBug(e, dx, dz, ram); }
-function killBug(e, dx, dz, ram) { const g = G, s = e.s, f = ram ? 2.1 : 1; e.dead = true; g.kills++; sfx.kill();
+  sparks(e.x - dx * .3, .55, e.z - dz * .3, -dx, -dz, ram ? 10 : 3, .7, 1, .25, 8); sfx.hit();
+  if (dx || dz) { for (let i = 0; i < (ram ? 6 : 2); i++) part(0, e.x + dx * .4 * e.s, .6 * e.s, e.z + dz * .4 * e.s, dx * rand(3, 8) + rand(-2, 2), rand(1.5, 4.5), dz * rand(3, 8) + rand(-2, 2), rand(.3, .5), rand(.12, .22), .3, .7, .08, .85, 16, .5, -.2); if (Math.random() < .18) mark(e.x + dx * rand(.8, 1.8), e.z + dz * rand(.8, 1.8), rand(.2, .45), rand(.2, .45), rand(0, TAU), 3, .03, .055, .012, .6, 14, rand(0, 9)); }      // the shot goes through: ichor sprays out the far side and spots the ground
+  if (e.hp <= 0) killBug(e, dx, dz, ram); }
+function killBug(e, dx, dz, ram) { const g = G, s = e.s, f = ram ? 2.1 : 1; e.dead = true; g.kills++; sfx.kill(); part(0, e.x, .7 * s, e.z, 0, 0, 0, .11, 2.4 * s, .7, 1, .4, .5, 0, 0, 4);
   if (!g.won) { g.sinceItem++; const want = g.parts ? (g.t - g.lastDrop > 20 ? clamp((g.sinceItem - 8) * .03, 0, 1) : 0) : clamp((g.sinceItem - 3) * .25, 0, 1), id = e.big || Math.random() < want ? rollItem(g, e.big) : null;      // a part roughly every twenty-odd seconds, plus one from each guard
     if (id) { g.sinceItem = 0; if (!e.big) g.lastDrop = g.t; g.drops.push({ k: 'item', id, x: e.x, z: e.z, t: 0 }); } if (e.big || (!id && Math.random() < .06)) g.drops.push({ k: 'fix', x: e.x + (id ? 1.2 : 0), z: e.z, t: 0 });
     if (g.s.leech && !g.dead) { g.hp = Math.min(g.s.maxhp, g.hp + g.s.leech); for (let i = 0; i < 3; i++) part(0, e.x, .8, e.z, (g.x - e.x) * 2.2 + rand(-1, 1), rand(1, 3), (g.z - e.z) * 2.2 + rand(-1, 1), .42, .32, .3, 1, .5, .9, 0, 0, -.4); }
     if (g.s.heart && !e.big && g.allies.length < 4 && Math.random() < .25) raise(e.x, e.z, e.s);
     if (g.s.ichor) blast(e.x, e.z, g.s.ichor === 1 ? 2.4 : 3.3, g.s.dmg * (g.s.ichor === 1 ? 2.5 : 4), [.6, 1, .25]); if (ram && g.s.chain) g.dcd -= g.s.dashCd * .6; }
-  if (e.big) { g.trauma = Math.min(1, g.trauma + .4); dust(e.x, e.z, 10, 5, .7); }
+  if (e.big) { g.trauma = Math.min(1, g.trauma + .5); if (ST.hitstop && !g.won) g.freeze = Math.max(g.freeze, .11); dust(e.x, e.z, 14, 6, .8); DL.push({ x: e.x, z: e.z, sx: 1, sz: 1, rot: 0, kind: 1, r: .6, g: 1, b: .3, a: .9, t: 0, life: .4, seed: 0, grow: 16 }); g.pulse = { x: e.x, z: e.z, c: [.7, 1, .3], t: 1 };
+    if (ST.gore) for (let i = 0; i < 10; i++) debris(MESH.cube, e.x + rand(-.8, .8), rand(.5, 1.4), e.z + rand(-.8, .8), rand(.3, .7), rand(.1, .25), rand(.4, .8), i % 3 ? CHIT : BONE, 0, rand(-9, 9), rand(6, 13), rand(-9, 9), rand(2.5, 4)); }       // a guard goes down like a building
   mark(e.x + dx * .4, e.z + dz * .4, rand(.9, 1.5) * s, rand(.9, 1.5) * s, rand(0, TAU), 3, .03, .055, .012, .75, 26, rand(0, 9));
   if (ST.gore) { const fl = (m, sx, sy, sz, col, em) => debris(m, e.x + rand(-.3, .3), rand(.4, .8), e.z + rand(-.3, .3), sx * s, sy * s, sz * s, col, em, dx * rand(3, 9) * f + rand(-3, 3), rand(4, 9) * (ram ? 1.3 : 1), dz * rand(3, 9) * f + rand(-3, 3), rand(2, 3.2));
     for (let i = 0; i < 5; i++) fl(MESH.cube, rand(.3, .6), rand(.1, .2), rand(.35, .7), i % 2 ? CHIT : CHIT2, -.5); fl(MESH.sph, .5, .4, .52, CHIT, -.5); for (let i = 0; i < 6; i++) fl(MESH.cube, .09, .75, .11, CHIT2, 0); for (let i = 0; i < 4; i++) fl(MESH.sph, .14, .14, .14, [.16, .4, .04], .25); }
@@ -260,7 +265,8 @@ function shockwave(r, dmg) { const g = G; for (const e of g.en) { if (e.dead) co
   DL.push({ x: g.x, z: g.z, sx: 1, sz: 1, rot: 0, kind: 1, r: .4, g: .7, b: 1, a: .9, t: 0, life: .35, seed: 0, grow: r * 2.6 }); g.pulse = { x: g.x, z: g.z, c: [.4, .65, 1], t: 1 }; g.trauma = Math.min(1, g.trauma + .25); sfx.blast(); }
 function hurtPlayer(d, dx, dz) { const g = G; if (g.inv > 0 || g.dead || g.demo || g.won) return;
   if (g.s.shock && g.shieldT <= 0) { g.shieldT = g.s.shock; g.inv = .5; shockwave(5.5, g.s.dmg * 3); return; }       // the plating takes this one
-  g.hp -= d * ST.dmg; g.inv = .45; g.hurtT = 1; g.sinceHit = 0; g.trauma = Math.min(1, g.trauma + .45); if (ST.hitstop) g.freeze = .06; g.rec.v -= 5; g.roll.v += rand(-4, 4); g.vx += dx * 5; g.vz += dz * 5;
+  g.hp -= d * ST.dmg; g.inv = .45; g.hurtT = 1; g.sinceHit = 0; g.trauma = Math.min(1, g.trauma + .45); if (ST.hitstop) g.freeze = .06; g.rec.v -= 5; g.roll.v += rand(-4, 4); g.vx += dx * 5; g.vz += dz * 5; g.arcT = .55; g.dip = 1; g.crouch.v += 3;
+  for (let i = 0; i < 3; i++) debris(MESH.cube, g.x + rand(-.5, .5), rand(1.8, 2.6), g.z + rand(-.5, .5), rand(.2, .4), .05, rand(.2, .4), i ? YEL : DRK, 0, dx * rand(2, 6) + rand(-4, 4), rand(4, 8), dz * rand(2, 6) + rand(-4, 4), rand(1.5, 2.4));
   sparks(g.x, 2, g.z, dx, dz, 12, 1, .7, .3, 10); sfx.hurt();
   if (g.hp <= 0 && g.s.molt && !g.molted) { g.molted = true; g.hp = g.s.maxhp * .5; g.inv = 1.6; shockwave(7.5, g.s.dmg * 8); g.trauma = 1; g.crouch.v += 7; cap('The second shell is shed. Half your hull is back.', 4); for (let i = 0; i < 14; i++) debris(MESH.cube, g.x + rand(-.6, .6), rand(2, 3), g.z + rand(-.6, .6), rand(.3, .7), .07, rand(.3, .7), BONE, 0, rand(-9, 9), rand(4, 11), rand(-9, 9), rand(2, 3.5)); return; }
   if (g.hp <= 0) die(); else if (g.hp < 30) cap('Hull critical'); }
@@ -270,7 +276,8 @@ function die() { const g = G; g.hp = 0; g.dead = .001; g.dash = null; g.boom = 1
 function startDash(dx, dz) { const g = G; if (!g || g.dash || g.dcd > 0 || g.dead || g.demo || state !== 'play') return; const l = Math.hypot(dx, dz); if (l < .01) { dx = Math.sin(g.head); dz = Math.cos(g.head); } else { dx /= l; dz /= l; }
   const B = DASH.burst * (g.s.chain ? 1.5 : 1); g.dash = { t: 0, dx, dz, hit: new Set(), skidded: false, B }; g.dcd = g.s.dashCd; g.inv = Math.max(g.inv, DASH.wind + B + .08); g.crouch.v += 5.5; g.fov.v += 2.4; g.trauma = Math.min(1, g.trauma + .22); sfx.dash();
   dust(g.x, g.z, 14, 6, .55); mark(g.x, g.z, 1.7, 1.7, 0, 0, 0, 0, 0, .55, 9); }
-function stomp(f, side) { const g = G; g.bob.v -= 1.5; g.roll.v += side * .9; g.trauma = Math.min(1, g.trauma + .03); dust(f.x, f.z, 2, 1.6, .28); if (!g.demo) sfx.step();
+function stomp(f, side) { const g = G; g.bob.v -= 2.1; g.roll.v += side * 1.3; g.trauma = Math.min(1, g.trauma + .035); dust(f.x, f.z, 3, 1.8, .3); if (!g.demo) sfx.step();
+  mark(f.x + Math.sin(f.a) * .1, f.z + Math.cos(f.a) * .1, .24, .44, f.a, 2, 0, 0, 0, .3, 10); { const c = Math.cos(g.aim), sn = Math.sin(g.aim), q = side * .4; part(1, g.x + q * c - .84 * sn, g.py + 2.1, g.z - q * sn - .84 * c, rand(-.3, .3), rand(2, 3), rand(-.3, .3), .8, .2, .2, .2, .21, .35, 0, 1.2, .7); }      // a print on the pad and a chuff from the stack
   if (g.s.stride && !g.demo && !g.dead) { g.stompFx = 1; g.bob.v -= 1; g.trauma = Math.min(1, g.trauma + .03); dust(f.x, f.z, 4, 3.5, .4); DL.push({ x: f.x, z: f.z, sx: .5, sz: .5, rot: 0, kind: 1, r: 1, g: .65, b: .2, a: .7, t: 0, life: .22, seed: 0, grow: 10 }); mark(f.x, f.z, .9, .9, rand(0, TAU), 3, 0, 0, 0, .45, 5, rand(0, 9));
     for (const e of g.en) { if (e.dead) continue; const ex = e.x - f.x, ez = e.z - f.z, d = Math.hypot(ex, ez) || 1; if (d < 2.5 + .4 * e.s) { e.kx += ex / d * (e.big ? 1 : 5); e.kz += ez / d * (e.big ? 1 : 5); hurtBug(e, g.s.dmg * 1.6, ex / d, ez / d); } } } }
 function gait(g, dt, burst) { const sp = Math.hypot(g.vx, g.vz), rx = Math.cos(g.head), rz = -Math.sin(g.head), ux = sp > .01 ? g.vx / sp : 0, uz = sp > .01 ? g.vz / sp : 0, mv = sp > 1.2;
@@ -285,7 +292,8 @@ function shoot(g) { const t = g.tgt, ox = g.x + g.muz[0], oy = g.muz[1], oz = g.
   while (left-- > 0) { let best = null, bt = g.s.range; for (const e of g.en) { if (e.dead) continue; const bx = e.x - ox, bz = e.z - oz, tt = bx * dx + bz * dz; if (tt < from || tt > bt + 1) continue; const p2 = bx * bx + bz * bz - tt * tt, r = .62 * e.s; if (p2 < r * r) { const th = tt - Math.sqrt(r * r - p2); if (th < bt && th >= from) { bt = th; best = e; } } }
     if (!best) break; ex = ox + dx * g.s.range; ez = oz + dz * g.s.range; hurtBug(best, g.s.dmg, dx, dz); if (boomShot) { blast(ox + dx * bt, oz + dz * bt, 2.3, g.s.dmg * 2.5); left = 0; } from = bt + .7; if (left <= 0) { ex = ox + dx * bt; ez = oz + dz * bt; } }
   TR.push({ x0: ox, y0: oy, z0: oz, x1: ex, y1: .55, z1: ez, t: 0, dur: Math.max(.03, Math.hypot(ex - ox, ez - oz) / 150) });
-  g.flash = 1; g.rec.v += 2.3; g.kick.v += 9; g.trauma = Math.min(1, g.trauma + .018); g.vx -= dx * .22; g.vz -= dz * .22; sfx.shot();
+  g.flash = 1; g.fRot = rand(0, TAU); g.rec.v += 2.3; g.kick.v += 9; g.roll.v += rand(-.8, .8); g.trauma = Math.min(1, g.trauma + .018); g.vx -= dx * .22; g.vz -= dz * .22; sfx.shot();
+  if (g.shotN2++ % 2 === 0) part(1, ox + dx * .3, oy, oz + dz * .3, dx * rand(2, 4) + rand(-.6, .6), rand(.3, 1), dz * rand(2, 4) + rand(-.6, .6), rand(.35, .6), .16, .5, .46, .4, .22, 0, 3, 1.1);      // a puff of gun smoke rolls out ahead
   const rx = Math.cos(g.aim), rz = -Math.sin(g.aim); debris(MESH.cyl, ox - dx * .9, oy + .05, oz - dz * .9, .05, .14, .05, BRASS, -.9, -rx * rand(2, 4) - dx, rand(3, 5), -rz * rand(2, 4) - dz, 1.3); }
 
 function update(dt) { const g = G; g.t += dt;
@@ -318,7 +326,7 @@ function update(dt) { const g = G; g.t += dt;
     if (g.s.mortar) { g.mortT -= dt; if (g.mortT <= 0) { const live = g.en.filter(e => !e.dead && (e.x - g.x) ** 2 + (e.z - g.z) ** 2 < 225), used = []; g.mortT = live.length ? 2.6 : .3;
       for (let k = 0; k < g.s.mortar && live.length; k++) { let best = null, bs = 0; for (const e of live) { if (used.some(u => Math.hypot(u.x - e.x, u.z - e.z) < 3.4)) continue; let n = e.big ? 3 : 1; for (const o of live) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < 3) n++; if (n > bs) { bs = n; best = e; } }
         if (!best) break; used.push(best); g.shells.push({ x0: g.x + Math.cos(g.aim) * .84, y0: g.py + 2, z0: g.z - Math.sin(g.aim) * .84, x1: best.x + best.vx * .5, z1: best.z + best.vz * .5, t: -k * .12, dur: .8 }); }
-      if (used.length) { sfx.mortar(); g.rec.v -= 3; g.bob.v -= 1.2; } } }
+      if (used.length) { sfx.mortar(); g.rec.v -= 3; g.bob.v -= 2; g.crouch.v += 2.5; g.trauma = Math.min(1, g.trauma + .08); const mx = g.x + Math.cos(g.aim) * .84, mz = g.z - Math.sin(g.aim) * .84; part(0, mx, g.py + 2.3, mz, 0, 1, 0, .1, 1.6, 1, .7, .3, .9, 0, 0, 3); for (let i = 0; i < 5; i++) part(1, mx, g.py + 2.3, mz, rand(-1.5, 1.5), rand(1, 3), rand(-1.5, 1.5), rand(.6, 1), .25, .3, .28, .26, .35, 0, 2, 1); } } }
     if (g.s.coil) { g.coilT -= dt; if (g.coilT <= 0) { const pts = [[g.x, g.py + 1.9, g.z - .3]], hit = []; let cx = g.x, cz = g.z, range = 8;
       while (hit.length < g.s.coil) { let best = null, bd = range; for (const e of g.en) { if (e.dead || hit.includes(e)) continue; const d = Math.hypot(e.x - cx, e.z - cz); if (d < bd) { bd = d; best = e; } } if (!best) break; hit.push(best); pts.push([best.x, .6 * best.s, best.z]); cx = best.x; cz = best.z; range = 5.5; }
       if (hit.length) { g.coilT = 1.05; g.bolts.push({ pts, t: .16 }); g.pulse = { x: pts[1][0], z: pts[1][2], c: [.4, .6, 1], t: .8 }; for (const e of hit) hurtBug(e, g.s.dmg * 2.4, 0, 0); sfx.zap(); } else g.coilT = .15; } }
@@ -347,6 +355,17 @@ function update(dt) { const g = G; g.t += dt;
   spring(g.bob, 0, 190, 15, dt); spring(g.roll, 0, 150, 12, dt); spring(g.rec, 0, 240, 17, dt); spring(g.kick, 0, 420, 26, dt); spring(g.crouch, 0, 130, 13, dt); spring(g.fov, 0, 85, 11, dt); spring(g.ram, burst ? 1 : 0, 300, 22, dt);
   spring(g.antx, -ax * .004, 60, 5, dt); spring(g.antz, -az * .004, 60, 5, dt);
   g.flash = Math.max(0, g.flash - dt * 22); g.heat += ((g.fireT > 0 && g.tgt && g.spinV > 24 ? 1 : 0) - g.heat) * Math.min(1, dt * 9); g.dcd -= dt; if (g.dcd <= 0 && g.dcd + dt > 0 && !g.demo) sfx.ready(); g.inv -= dt; g.hurtT = Math.max(0, g.hurtT - dt * 1.8); g.sinceHit += dt; g.boom = Math.max(0, g.boom - dt * 1.4);
+  // heat in the barrels, arcs after a hit, weld sparks after a fitting, and what a damaged hull does
+  const firing = g.heat > .5; g.hot = clamp(g.hot + (firing ? dt * .45 : -dt * .3), 0, 1); g.dip = Math.max(0, g.dip - dt * 4.5); g.arcT -= dt; g.weldT -= dt; g.puffCd -= dt;
+  if (!g.dead && !g.demo) { const mxp = g.x + g.muz[0], mzp = g.z + g.muz[2], hk = g.hp / g.s.maxhp, ex = g.x - Math.sin(g.aim) * .8, ez = g.z - Math.cos(g.aim) * .8;
+    if (!firing && g.hot > .15 && Math.random() < dt * g.hot * 26) part(1, mxp + rand(-.1, .1), g.muz[1], mzp + rand(-.1, .1), rand(-.2, .2), rand(.8, 1.6), rand(-.2, .2), rand(.6, 1), .12, .5, .48, .45, .3 * g.hot, 0, .8, .5);      // the barrels smoke as they cool
+    if (g.arcT > 0 && Math.random() < dt * 45) part(2, g.x + rand(-.8, .8), g.py + rand(.4, 1.6), g.z + rand(-.8, .8), rand(-6, 6), rand(-2, 6), rand(-6, 6), rand(.06, .14), .05, .6, .8, 1, 1, 0, 2, 0, .04);
+    if (g.weldT > 0 && Math.random() < dt * 60) part(2, g.x + rand(-.9, .9), g.py + rand(.3, 1.7), g.z + rand(-.9, .9), rand(-4, 4), rand(1, 6), rand(-4, 4), rand(.15, .35), .045, 1, .9, .6, 1, 20, 1.5, 0, .035);
+    if (hk < .5 && Math.random() < dt * (1 - hk) * 14) part(1, ex + rand(-.3, .3), g.py + 1.5, ez + rand(-.3, .3), rand(-.4, .4), rand(1.4, 2.6), rand(-.4, .4), rand(.9, 1.5), .22, .07, .07, .075, .5, 0, .7, .8);
+    if (hk < .3 && Math.random() < dt * 5) sparks(g.x + rand(-.6, .6), g.py + rand(.6, 1.4), g.z + rand(-.6, .6), rand(-1, 1), rand(-1, 1), 3, .7, .85, 1, 7);
+    if (hk < .16 && Math.random() < dt * 22) part(0, ex + rand(-.3, .3), g.py + 1.2, ez + rand(-.3, .3), rand(-.3, .3), rand(1.6, 3), rand(-.3, .3), rand(.3, .5), rand(.3, .5), 1, rand(.4, .6), .1, .8, -1, .5, -.6);
+    if (!g.dash && g.puffCd <= 0 && Math.hypot(ax, az) > 105) { g.puffCd = .35; g.jet = Math.max(g.jet, .4); dust(g.x, g.z, 4, 3, .35); noise(.12, .07, 1400, 'bandpass', 0, -700); } }      // a short correcting burst from the thrusters on a hard change of direction
+  g.aimLean += ((g.tgt && !g.dead ? 1 : 0) - g.aimLean) * Math.min(1, dt * 2.5);
   g.smokeT -= dt; if (g.smokeT <= 0) { g.smokeT = g.dead ? .05 : .16; const c = Math.cos(g.aim), s = Math.sin(g.aim), k = Math.random() < .5 ? .4 : -.4;
     if (g.dead) { part(0, g.x + rand(-.4, .4), rand(1.2, 1.8), g.z + rand(-.4, .4), rand(-.5, .5), rand(2, 4), rand(-.5, .5), rand(.4, .8), rand(.5, 1), 1, rand(.35, .6), .1, .9, -2, 1, -.5); part(1, g.x, 2.2, g.z, rand(-.6, .6), rand(1.5, 3), rand(-.6, .6), 1.6, .6, .08, .08, .08, .5, 0, .6, .9); }
     else part(1, g.x + k * c - .9 * s, g.py + 1.75, g.z - k * s - .9 * c, rand(-.3, .3), rand(1, 1.8), rand(-.3, .3), 1.1, .16, .16, .16, .17, .22, 0, .8, .5); }
@@ -377,7 +396,7 @@ function update(dt) { const g = G; g.t += dt;
   if (g.pulse) { g.pulse.t -= dt * 5; if (g.pulse.t <= 0) g.pulse = null; } g.itemFx = Math.max(0, g.itemFx - dt * 1.6);
 }
 /* camera and shake run on real time, so they stay alive through a hit-stop */
-function camUpdate(dt) { const g = G; g.trauma = Math.max(0, g.trauma - dt * 1.4); const k = 1 - Math.exp(-dt * 7.5), tx = g.x + clamp(g.vx, -9, 9) * .16, tz = g.z + clamp(g.vz, -9, 9) * .16; g.cam.x += (tx - g.cam.x) * k; g.cam.z += (tz - g.cam.z) * k; g.cam.d += ((g.demo ? .5 : 1) - g.cam.d) * (1 - Math.exp(-dt * 3)); }
+function camUpdate(dt) { const g = G; g.trauma = Math.max(0, g.trauma - dt * 1.4); const k = 1 - Math.exp(-dt * 7.5), tx = g.x + clamp(g.vx, -9, 9) * .16 + Math.sin(g.aim) * g.aimLean * 1.1, tz = g.z + clamp(g.vz, -9, 9) * .16 + Math.cos(g.aim) * g.aimLean * 1.1; g.cam.x += (tx - g.cam.x) * k; g.cam.z += (tz - g.cam.z) * k; g.cam.d += ((g.demo ? .5 : 1) - g.cam.d) * (1 - Math.exp(-dt * 3)); }
 
 /* ---------- drawing ---------- */
 const _H = [0, 0, 0], _K = [0, 0, 0], _A = [0, 0, 0], _B = [0, 0, 0], _P = [0, 0, 0], _F = [0, 0, 0];
@@ -389,7 +408,7 @@ function at(x, y, z, k) { push(); T(x, y, z); SCL(k); T(-x, -y, -z); }
 const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 function drawMech(g) {
   const hx = Math.sin(g.head), hz = Math.cos(g.head), rx = hz, rz = -hx, sp = Math.hypot(g.vx, g.vz), wk = clamp(sp / 6.4, 0, 1), burst = g.ram.x;
-  let py = HIP + g.bob.x - Math.max(-.1, g.crouch.x) * .32 + Math.sin(g.t * 13) * .005;
+  let py = HIP + g.bob.x - Math.max(-.1, g.crouch.x) * .32 + Math.sin(g.t * 13) * .005 - g.heat * .07;      // it sits into the recoil while the gun runs
   for (let i = 0; i < 2; i++) { const f = g.feet[i], side = i ? -1 : 1, dh = Math.hypot(f.x - g.x - rx * side * HIPW, f.z - g.z - rz * side * HIPW); py = Math.min(py, Math.sqrt(Math.max(.5, REACH * REACH - dh * dh)) + f.y * .5 + .2); }
   g.py = py; const sway = Math.sin(g.phase * TAU) * .07 * wk, twist = Math.sin(g.phase * TAU) * .09 * wk;
   const G1 = clamp(g.gr[1].x, 0, 1.3), G2 = clamp(g.gr[2].x, 0, 1.3), G3 = clamp(g.gr[3].x, 0, 1.3), G4 = clamp(g.gr[4].x, 0, 1.3), G5 = clamp(g.gr[5].x, 0, 1.3), G6 = clamp(g.gr[6].x, 0, 1.3);      // how far the alien parts have taken over, in six stages
@@ -412,7 +431,7 @@ function drawMech(g) {
     decal(f.x, f.z, .5, .68, f.a, 0, 0, 0, 0, .6 * (1 - Math.min(1, f.y * 2.2))); }
   if (g.dead) { glow(g.x, py + .5, g.z, 2.2 + Math.sin(g.t * 30) * .3, 1, .5, .12, .5); return; }
   // torso: turns to the target on its own ring, pitches with recoil, rolls when a foot lands
-  T(0, .36, 0); RY(g.aim - g.head - twist); RX(-g.rec.x * .05 + burst * .22); RZ(g.roll.x * .035);
+  T(0, .36, 0); RY(g.aim - g.head - twist); RX(-g.rec.x * .2 + burst * .22); RZ(g.roll.x * .04 + clamp(g.aimV, -17, 17) * .007);      // shudders with the gun, and leans into its own turns
   box(0, .56, .04, 1.32, .96, 1.12, HULL); box(0, .16, .5, 1.0, .3, .34, DRK, -.6);                         // cab and chin
   box(-.08, .78, .61, .9, .17, .05, [.9, .5, .12], .55); box(-.08, .92, .65, 1.04, .1, .2, YEL2); box(-.08, .64, .63, 1.04, .08, .1, DRK); box(.3, .4, .62, .5, .3, .06, YEL2); box(-.36, .42, .62, .3, .22, .05, DRK);          // a visor slit under a hood, patched plating below
   box(0, 1.08, -.05, .7, .1, .7, YEL2); box(.66, .56, .1, .05, .5, .7, DRK); box(-.66, .56, .1, .05, .5, .7, DRK);
@@ -451,14 +470,15 @@ function drawMech(g) {
   if (G6 > .02) { for (const q of [-1, 1]) { push(); T(q * .26, .26, .7); RY(q * (.25 + Math.abs(Math.sin(g.t * 2.4)) * .3)); RX(Math.PI / 2 + .35); SCL(G6); T(0, .28, 0); draw(MESH.cone, .15, .6, .12, BONE); pop(); }
     for (let i = 0; i < 4; i++) { push(); T(-.2 - i * .13, .98 + (i % 2) * .09, .64); draw(MESH.sph, .1 * G6, .1 * G6, .08 * G6, [.75, 1, .2], 2.5); pop(); } }
   // right arm: the rotary gun. The barrels really turn and the whole gun kicks back on a spring.
-  push(); T(-.98, .62, .12); RX(g.pitch.x); T(0, 0, -g.kick.x * .012);
+  push(); T(-.98, .62, .12); RX(g.pitch.x + Math.sin(g.phase * TAU * 2) * .035 * wk - g.kick.x * .05); T(0, 0, -Math.max(-.3, g.kick.x) * .26);
     box(0, 0, .22, .36, .42, .78, DRK, -.6); box(0, .24, .2, .2, .08, .5, YEL2); push(); T(.02, -.04, -.26); RZ(Math.PI / 2); draw(MESH.cyl, .62, .3, .62, YEL2); pop(); box(.2, .0, .0, .1, .2, .5, BRASS, -.9);
-    push(); T(0, -.02, .62); RZ(g.spin); for (let k = 0; k < 6; k++) { push(); RZ(k * TAU / 6); T(.1, 0, .46); RX(Math.PI / 2); draw(MESH.cyl, .065, .96, .065, STL, -.9); pop(); }
+    push(); T(0, -.02, .62); RZ(g.spin); for (let k = 0; k < 6; k++) { push(); RZ(k * TAU / 6); T(.1, 0, .46); RX(Math.PI / 2); draw(MESH.cyl, .065, .96, .065, g.hot > .05 ? mix3(STL, [1, .3, .05], g.hot) : STL, g.hot > .05 ? g.hot * 1.5 : -.9); pop(); }
       for (const z of [.12, .55, .9]) { push(); T(0, 0, z); RX(Math.PI / 2); draw(MESH.cyl, .36, .06, .36, DRK, -.7); pop(); } pop();
     if ((k = fitK(g, 'hot')) > 0) { for (const z of [1.0, 1.28]) { push(); T(0, -.02, z); RX(Math.PI / 2); draw(MESH.cyl, .46 * k, .1, .46 * k, [.5, .12, .03], .3 + g.heat * 2.2); pop(); } }       // heat collars that glow while the gun runs
     if ((k = fitK(g, 'pierce')) > 0) { push(); T(0, -.3, .7); RX(Math.PI / 2); SCL(k); T(0, .75, 0); draw(MESH.cone, .13, 1.5, .13, BONE); pop(); }
     xf(0, -.02, 1.62, _B); g.muz[0] = _B[0] - g.x; g.muz[1] = _B[1]; g.muz[2] = _B[2] - g.z;
-    if (g.flash > .05) { const f = g.flash; glow(_B[0], _B[1], _B[2], 1.5 * f + .3, 1, .8, .4, f); xfd(0, 0, 1, _F); sprite(PADD, _B[0] + _F[0] * .5, _B[1] + _F[1] * .5, _B[2] + _F[2] * .5, .22 * f, 0, _F[0] * .8, _F[1] * .8, _F[2] * .8, 1, .75, .35, f); }
+    if (g.flash > .05) { const f = g.flash; glow(_B[0], _B[1], _B[2], 1.5 * f + .3, 1, .8, .4, f); xfd(0, 0, 1, _F); sprite(PADD, _B[0] + _F[0] * .6, _B[1] + _F[1] * .6, _B[2] + _F[2] * .6, .24 * f, 0, _F[0] * 1.0, _F[1] * 1.0, _F[2] * 1.0, 1, .75, .35, f);
+      for (let q = 0; q < 3; q++) { const a = g.fRot + q * TAU / 3, cx = Math.cos(a) * .5, cy = Math.sin(a) * .5; xfd(cx, cy, .35, _F); sprite(PADD, _B[0] + _F[0] * .5, _B[1] + _F[1] * .5, _B[2] + _F[2] * .5, .13 * f, 0, _F[0] * .55, _F[1] * .55, _F[2] * .55, 1, .7, .3, f * .8); } }       // a three-pointed flash that turns from shot to shot
   pop();
   // left arm: the ram plate. It hangs at the side and punches out in front for a dash.
   const r = clamp(g.ram.x, -.2, 1.25), sw = Math.sin(g.phase * TAU) * .14 * wk;
@@ -510,20 +530,21 @@ function render() { const g = G; if (!GLOK) return; const fires = [];
   for (const d of DL) decal(d.x, d.z, d.sx, d.sz, d.rot, d.kind, d.r, d.g, d.b, d.a * Math.min(1, (d.life - d.t) * .6), 0, d.seed);
   for (const p of PT) { const f = 1 - p.t / p.life, s = Math.max(.01, p.size + p.grow * p.t); if (p.k === 1) sprite(PSMK, p.x, p.y, p.z, s, s, 0, 0, 0, p.r, p.g, p.b, p.a * f); else if (p.k === 2) sprite(PADD, p.x, p.y, p.z, s, 0, p.vx * p.len, p.vy * p.len, p.vz * p.len, p.r, p.g, p.b, p.a * f); else sprite(PADD, p.x, p.y, p.z, s, s, 0, 0, 0, p.r, p.g, p.b, p.a * f); }
   for (const r of TR) { const u = r.t / r.dur, dx = r.x1 - r.x0, dy = r.y1 - r.y0, dz = r.z1 - r.z0, l = Math.hypot(dx, dy, dz) || 1, hl = Math.min(1.5, l * .3) / l; if (r.c === 2) sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .16, 0, dx * hl * .5, dy * hl * .5, dz * hl * .5, .7, .95, .15, 1); else if (r.c) sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .06, 0, dx * hl, dy * hl, dz * hl, .3, .9, 1, 1); else sprite(PADD, r.x0 + dx * u, r.y0 + dy * u, r.z0 + dz * u, .07, 0, dx * hl, dy * hl, dz * hl, 1, .85, .5, 1); }
-  // lights: the lamp, a soft fill so the mech never vanishes, then whatever is burning or firing
+  // lights: the lamp, a soft fill so the mech never vanishes, then whatever is burning or firing.
+  // The pad is close to black outside them; the brightness setting lifts it.
   const br = ST.bright + (ST.contrast ? .25 : 0), L = SC.lights; L.length = 0; const on = g.dead ? 0 : 1;
-  L.push({ p: [g.x, 4.2, g.z + 1.5], c: [.3 * on + br * .5, .28 * on + br * .5, .27 * on + br * .55], r: 9 + br * 6 });
+  L.push({ p: [g.x, 4.2, g.z + 1.5], c: [.2 * on + br * .55, .19 * on + br * .55, .2 * on + br * .6], r: 7.5 + br * 7 });
   if (g.heat > .05) { const f = g.heat * (ST.flash ? .6 : 1) * (.92 + Math.sin(g.t * 47) * .08); L.push({ p: [g.x + g.muz[0], g.muz[1] + .3, g.z + g.muz[2]], c: [2.6 * f, 1.7 * f, .7 * f], r: 8 }); }      // a steady glow while the gun runs: a light that blinked per shot would strobe
   if (g.jet > .05) L.push({ p: [g.x - Math.sin(g.aim) * 1.8, 1.6, g.z - Math.cos(g.aim) * 1.8], c: [6 * g.jet, 3 * g.jet, 1 * g.jet], r: 10 });
   if (g.boom > 0 || g.dead) L.push({ p: [g.x, 2.5, g.z], c: [9 * g.boom + (g.dead ? 2.4 + Math.sin(g.t * 23) * .5 : 0), 4 * g.boom + (g.dead ? .9 : 0), 1 * g.boom], r: 13 });
   if (g.pulse) { const k = g.pulse.t, c = g.pulse.c; L.push({ p: [g.pulse.x, 1.5, g.pulse.z], c: [c[0] * 5 * k, c[1] * 5 * k, c[2] * 5 * k], r: 9 }); }
   if (g.fires.length) { const f = g.fires[g.fires.length >> 1], k = Math.min(1, f.t); L.push({ p: [f.x, 1.3, f.z], c: [3.6 * k, 1.5 * k, .4 * k], r: 9 }); }
   let nd = null; for (const d of g.drops) if (d.k === 'item' && (!nd || (d.x - g.x) ** 2 + (d.z - g.z) ** 2 < (nd.x - g.x) ** 2 + (nd.z - g.z) ** 2)) nd = d; if (nd && L.length < 5) { const c = RAR[ITEM[nd.id].r].col; L.push({ p: [nd.x, 1.6, nd.z], c: [c[0] * 1.6, c[1] * 1.6, c[2] * 1.6], r: 6 }); }
-  fires.sort((a, b) => (a.x - g.x) ** 2 + (a.z - g.z) ** 2 - (b.x - g.x) ** 2 - (b.z - g.z) ** 2); for (const p of fires) { if (L.length >= 6) break; const fl = .85 + Math.sin(g.t * 13 + p.v * 20) * .1 + Math.sin(g.t * 31 + p.v * 7) * .06; L.push({ p: [p.x, 1.9, p.z], c: [4.4 * fl, 1.9 * fl, .5 * fl], r: 11 }); }
+  fires.sort((a, b) => (a.x - g.x) ** 2 + (a.z - g.z) ** 2 - (b.x - g.x) ** 2 - (b.z - g.z) ** 2); for (const p of fires) { if (L.length >= 6) break; const fl = .85 + Math.sin(g.t * 13 + p.v * 20) * .1 + Math.sin(g.t * 31 + p.v * 7) * .06; L.push({ p: [p.x, 1.9, p.z], c: [5.2 * fl, 2.1 * fl, .5 * fl], r: 12.5 }); }
   const sh = g.trauma * g.trauma * ST.shake, tt = performance.now() / 1000 * 32, d = 31 * g.cam.d, P = 54 * Math.PI / 180, sx = sh * .55 * shakeN(tt, 1), sz = sh * .55 * shakeN(tt, 2);
   SC.cam[0] = g.cam.x + sx; SC.cam[1] = Math.sin(P) * d; SC.cam[2] = g.cam.z + Math.cos(P) * d + sz; SC.at[0] = g.cam.x + sx * .6 + sh * .3 * shakeN(tt, 3); SC.at[1] = 1.2; SC.at[2] = g.cam.z - 2.2 * g.cam.d + sz * .6; SC.fov = .8 + g.fov.x * .09;
   SC.focus[0] = g.x; SC.focus[2] = g.z; SC.spotP = g.lampP; const ld = g.lampD, ll = Math.hypot(ld[0], ld[1], ld[2]) || 1; SC.spotD[0] = ld[0] / ll; SC.spotD[1] = ld[1] / ll; SC.spotD[2] = ld[2] / ll;
-  const sr = g.s.sear; SC.spotC[0] = (sr ? 5.2 : 4.1) * on; SC.spotC[1] = (sr ? 3.2 : 3.7) * on; SC.spotC[2] = (sr ? 1.5 : 3.0) * on; SC.spotCos[0] = sr ? .64 : .74; SC.spotCos[1] = sr ? .88 : .92; SC.spotFov = sr ? 1.9 : 1.62; SC.ambS[0] = .018 + br * .12; SC.ambS[1] = .024 + br * .13; SC.ambS[2] = .042 + br * .15; SC.ambG[0] = SC.ambG[1] = SC.ambG[2] = .01 + br * .05; SC.moonC[0] = .03 + br * .1; SC.moonC[1] = .042 + br * .1; SC.moonC[2] = .07 + br * .1; SC.fogR[0] = 15 + br * 10; SC.fogR[1] = 27 + br * 14;
+  const sr = g.s.sear, lk = on * (1 - (ST.flash ? .15 : .55) * g.dip) /* a hit makes the lamp dip for a moment */; SC.spotC[0] = (sr ? 5.8 : 4.7) * lk; SC.spotC[1] = (sr ? 3.5 : 4.2) * lk; SC.spotC[2] = (sr ? 1.6 : 3.4) * lk; SC.spotCos[0] = sr ? .64 : .74; SC.spotCos[1] = sr ? .88 : .92; SC.spotFov = sr ? 1.9 : 1.62; SC.ambS[0] = .005 + br * .13; SC.ambS[1] = .008 + br * .14; SC.ambS[2] = .015 + br * .17; SC.ambG[0] = SC.ambG[1] = SC.ambG[2] = .003 + br * .055; SC.moonC[0] = .012 + br * .11; SC.moonC[1] = .019 + br * .11; SC.moonC[2] = .036 + br * .12; SC.fogR[0] = 10.5 + br * 14; SC.fogR[1] = 20 + br * 20;
   renderScene(SC, glc.width, glc.height); hud();
 }
 
@@ -533,6 +554,7 @@ const stickBase = () => ({ x: ST.hand === 'left' ? W - 88 : 88, y: H - 150 });
 const pauseBtn = () => ({ x: W - 34, y: SAFE + 36, r: 22 });
 const FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
 function hud() { const g = G; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H); if (state !== 'play') return; const ts = ST.text, hc = ST.contrast;
+  { const v = ctx.createRadialGradient(W / 2, H * .52, H * .3, W / 2, H * .52, H * .74), a = Math.max(0, .62 - ST.bright * .6 - (ST.contrast ? .25 : 0)); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${a})`); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H); }      // the dark closes in at the edges
   if (g.hurtT > 0 || g.hp < 30) { const a = Math.max(g.hurtT * (ST.flash ? .3 : .55), g.hp < 30 && !g.dead ? .22 + (ST.flash ? 0 : Math.sin(g.t * 6) * .08) : 0), gr = ctx.createRadialGradient(W / 2, H / 2, H * .25, W / 2, H / 2, H * .62); gr.addColorStop(0, 'rgba(200,20,10,0)'); gr.addColorStop(1, `rgba(200,20,10,${a})`); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
   // hull
   const bw = Math.min(150, W * .34), bh = hc ? 12 : 8, bx = 14, by = SAFE + 18, k = clamp(g.hp / g.s.maxhp, 0, 1); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4); ctx.fillStyle = k < .3 ? '#ff4a2e' : '#f2b01e'; ctx.fillRect(bx, by, bw * k, bh); ctx.strokeStyle = hc ? '#fff' : 'rgba(230,223,208,.5)'; ctx.lineWidth = 1; ctx.strokeRect(bx - 1.5, by - 1.5, bw + 3, bh + 3);
