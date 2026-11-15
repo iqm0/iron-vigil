@@ -175,7 +175,7 @@ function newGame(demo) {
     bob: S0(), lx: S0(), lz: S0(), roll: S0(), rec: S0(), kick: S0(), ram: S0(), crouch: S0(), antx: S0(), antz: S0(), fov: S0(), pitch: S0(),
     spin: 0, spinV: 0, fireT: 0, flash: 0, heat: 0, jet: 0, tgt: null, dash: null, dcd: 0, inv: 0, hurtT: 0, sinceHit: 9, trauma: 0, freeze: 0, boom: 0, dead: 0, smokeT: 0,
     cam: { x: 0, z: 0, d: demo ? .5 : 1 }, en: [], spawnT: 1.2, cap: null, muz: [-.6, 2.3, 1.7], lampP: [0, 2.9, 1], lampD: [0, -.2, 1],
-    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, cues: [], allies: [], fitT: {}, gr: [0, 1, 2, 3, 4, 5, 6].map(S0), stage: 0, reapA: 0, graftT: 0, graftP: [0, 3, 0], molted: false, stompFx: 0, hot: 0, shotN2: 0, spinT: 0, lastShot: 9, ck: { x: 0, z: 0 }, fRot: 0, arcT: 0, weldT: 0, dip: 0, puffCd: 0, aimLean: 0, s: (() => { const b = baseStats(); b.dmg = b.pow * SHELL; return b; })() };
+    items: [], lv: {}, parts: 0, fresh: [], drops: [], fires: [], blasts: [], shells: [], bolts: [], drones: [], pulse: null, shotN: 0, sinceItem: 0, itemFx: 0, itemCol: [1, 1, 1], fireTick: 0, mortT: 1.5, coilT: 1, shieldT: 0, eliteT: 48, surged: -1, won: 0, lastDrop: 0, N: NIGHTS[night - 1], night, globs: [], pools: [], saidSpit: false, cues: [], allies: [], fitT: {}, gr: [0, 1, 2, 3, 4, 5, 6].map(S0), stage: 0, reapA: 0, graftT: 0, graftP: [0, 3, 0], molted: false, stompFx: 0, hot: 0, shotN2: 0, spinT: 0, lastShot: 9, ck: { x: 0, z: 0 }, ix: 0, iz: 0, lookX: 0, lookZ: 0, fRot: 0, arcT: 0, weldT: 0, dip: 0, puffCd: 0, aimLean: 0, s: (() => { const b = baseStats(); b.dmg = b.pow * SHELL; return b; })() };
   if (demo) { G.feet[0].x = Math.cos(.55) * HIPW; G.feet[0].z = -Math.sin(.55) * HIPW; G.feet[1].x = -G.feet[0].x; G.feet[1].z = -G.feet[0].z; G.feet[0].a = G.feet[1].a = .55; }
   PT.length = DB.length = DL.length = TR.length = 0; cardQ.length = 0;
 }
@@ -307,13 +307,14 @@ function shoot(g) { const t = g.tgt, ox = g.x + g.muz[0], oy = g.muz[1], oz = g.
   while (left-- > 0) { let best = null, bt = g.s.range; for (const e of g.en) { if (e.dead) continue; const bx = e.x - ox, bz = e.z - oz, tt = bx * dx + bz * dz; if (tt < from || tt > bt + 1) continue; const p2 = bx * bx + bz * bz - tt * tt, r = .66 * e.s; if (p2 < r * r) { const th = tt - Math.sqrt(r * r - p2); if (th < bt && th >= from) { bt = th; best = e; } } }
     if (!best) break; hit = true; ex = ox + dx * g.s.range; ez = oz + dz * g.s.range; hurtBug(best, dmg, dx, dz, false, true); dmg *= .65; if (boomShot) { blast(ox + dx * bt, oz + dz * bt, 2.3, g.s.pow * 2.5); left = 0; } from = bt + .7; if (left <= 0) { ex = ox + dx * bt; ez = oz + dz * bt; } }       // each bug it passes through takes a third off the shell
     TR.push({ x0: ox, y0: oy, z0: oz, x1: ex, y1: .55, z1: ez, t: 0, dur: Math.max(.04, Math.hypot(ex - ox, ez - oz) / 115), hv: 1 });
-  g.flash = 1; g.fRot = rand(0, TAU); g.spinT += TAU / 3; g.lastShot = 0; g.rec.v += 7; g.kick.v += 27; g.roll.v += rand(-2.2, 2.2); g.bob.v -= .7; g.trauma = Math.min(1, g.trauma + .004); g.vx -= dx * .12; g.vz -= dz * .12; sfx.shot();
+  g.flash = 1; g.fRot = rand(0, TAU); g.spinT += TAU / 3; g.lastShot = 0; g.rec.v += 7; g.kick.v += 27; g.roll.v += rand(-2.2, 2.2); g.bob.v -= .7; sfx.shot();
   for (let i = 0; i < 4; i++) part(1, ox + dx * .4, oy, oz + dz * .4, dx * rand(2, 7) + rand(-1, 1), rand(.2, 1.4), dz * rand(2, 7) + rand(-1, 1), rand(.5, .9), .22, .55, .5, .44, .3, 0, 3, 1.3);
   for (const q of [-1, 1]) { part(2, ox, oy, oz, rx * q * rand(7, 11), rand(0, 1.5), rz * q * rand(7, 11), .09, .09, 1, .75, .35, 1, 0, 6, 0, .07); part(1, ox + rx * q * .3, oy, oz + rz * q * .3, rx * q * rand(2, 4), rand(.3, 1), rz * q * rand(2, 4), rand(.4, .7), .18, .5, .46, .4, .25, 0, 3, 1); }      // the muzzle brake vents to both sides
   debris(MESH.cyl, ox - dx * 1.1, oy + .05, oz - dz * 1.1, .1, .3, .1, BRASS, -.9, -rx * rand(3.5, 6) - dx * 1.5, rand(4.5, 7), -rz * rand(3.5, 6) - dz * 1.5, 3.5); }
 
 function update(dt) { const g = G; g.t += dt;
   let ix = 0, iz = 0; if (!g.demo && !g.dead) { if (stick) { ix = stick.dx; iz = stick.dy; } if (keys.w || keys.arrowup) iz -= 1; if (keys.s || keys.arrowdown) iz += 1; if (keys.a || keys.arrowleft) ix -= 1; if (keys.d || keys.arrowright) ix += 1; const l = Math.hypot(ix, iz); if (l > 1) { ix /= l; iz /= l; } }
+  g.ix = ix; g.iz = iz;
   // dash: a short windup, a thruster burst, then a skid
   let burst = false; if (g.dash) { const d = g.dash; d.t += dt; if (d.t < DASH.wind + d.B) { burst = d.t >= DASH.wind; const v = burst ? DASH.v : DASH.v * .3; g.vx = d.dx * v; g.vz = d.dz * v; } else { if (!d.skidded) { d.skidded = true; sfx.skid(); dust(g.x, g.z, 8, 4, .5); if (g.s.chain > 1) { blast(g.x, g.z, 4.6, g.s.pow * 6); DL.push({ x: g.x, z: g.z, sx: 1, sz: 1, rot: 0, kind: 1, r: 1, g: .6, b: .2, a: .9, t: 0, life: .3, seed: 0, grow: 14 }); g.crouch.v += 6; g.trauma = Math.min(1, g.trauma + (.35) * FB); } } if (d.t > DASH.wind + d.B + DASH.rec) g.dash = null; } }
   if (!g.dash || g.dash.skidded) { const k = 1 - Math.exp(-dt * (g.dash ? 8 : 13)), v = g.s.speed; g.vx += (ix * v - g.vx) * k; g.vz += (iz * v - g.vz) * k; }
@@ -413,7 +414,7 @@ function update(dt) { const g = G; g.t += dt;
   if (g.pulse) { g.pulse.t -= dt * 5; if (g.pulse.t <= 0) g.pulse = null; } g.itemFx = Math.max(0, g.itemFx - dt * 1.6);
 }
 /* camera and shake run on real time, so they stay alive through a hit-stop */
-function camUpdate(dt) { const g = G; g.trauma = Math.max(0, g.trauma - dt * 1.4); const k = 1 - Math.exp(-dt * 7.5), tx = g.x + clamp(g.vx, -9, 9) * .16 + Math.sin(g.aim) * g.aimLean * .55, tz = g.z + clamp(g.vz, -9, 9) * .16 + Math.cos(g.aim) * g.aimLean * .55; g.cam.x += (tx - g.cam.x) * k; g.cam.z += (tz - g.cam.z) * k; g.cam.d += ((g.demo ? .5 : 1) - g.cam.d) * (1 - Math.exp(-dt * 3)); }
+function camUpdate(dt) { const g = G; g.trauma = Math.max(0, g.trauma - dt * 1.4); const k = 1 - Math.exp(-dt * 7.5), kl = 1 - Math.exp(-dt * 3); g.lookX += (g.ix * g.s.speed - g.lookX) * kl; g.lookZ += (g.iz * g.s.speed - g.lookZ) * kl; const tx = g.x + g.lookX * .16, tz = g.z + g.lookZ * .16; g.cam.x += (tx - g.cam.x) * k; g.cam.z += (tz - g.cam.z) * k; g.cam.d += ((g.demo ? .5 : 1) - g.cam.d) * (1 - Math.exp(-dt * 3)); }
 
 /* ---------- drawing ---------- */
 const _H = [0, 0, 0], _K = [0, 0, 0], _A = [0, 0, 0], _B = [0, 0, 0], _P = [0, 0, 0], _F = [0, 0, 0];
