@@ -783,13 +783,8 @@ function hud() { const g = G; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearR
   for (const c of g.cues) { const ux = Math.sin(c.a), uy = Math.cos(c.a), t = Math.min(ux ? (W / 2) / Math.abs(ux) : 1e9, uy ? (H / 2) / Math.abs(uy) : 1e9), ex = W / 2 + ux * t, ey = H / 2 + uy * t, k = Math.min(1, c.t) * Math.min(1, (3.4 - c.t) * 3) * (ST.flash ? .8 : .75 + Math.sin(performance.now() / 160) * .25), gr = ctx.createRadialGradient(ex, ey, 0, ex, ey, W * .42); gr.addColorStop(0, `rgba(255,40,20,${(hc ? .6 : .38) * k})`); gr.addColorStop(1, 'rgba(255,40,20,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
   /* A wind-up from behind the walker is under the thumbs, so it is repeated above them. Behind means toward the bottom of the screen, not behind the walker's heading.
      The controls cover the ground from about 4 m back; an animal centred 3 m back already has most of its body under them. */
-  const rearTell = g.en.some(e => e.shear && e.state === 'tell' && e.locked && e.z > g.z + 3);
-  if (rearTell) { ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.round(13 * Math.min(ts, 1.5))}px ${FONT}`;
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#43140e'; ctx.lineWidth = 4;
-    const wx = W / 2, wy = H * .725;       /* below the walker's feet, above the controls */
-    ctx.strokeText('REAR ATTACK', wx, wy); ctx.fillText('REAR ATTACK', wx, wy);
-    ctx.restore(); }
+  for (const e of g.en) if (e.shear && e.state === 'tell' && e.locked && e.z > g.z + 3) { const w = toScr(g.x, 0, g.z), q = toScr(e.x, 0, e.z); if (!w) continue; const a = q ? Math.atan2(q[1] - w[1], q[0] - w[0]) : Math.PI / 2, k = ST.flash ? .85 : .7 + Math.sin(performance.now() / 110) * .3;
+    ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,40,20,${(hc ? .95 : .8) * k})`; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(w[0], w[1], 72, a - .5, a + .5); ctx.stroke(); ctx.strokeStyle = `rgba(255,40,20,${.28 * k})`; ctx.lineWidth = 16; ctx.beginPath(); ctx.arc(w[0], w[1], 72, a - .5, a + .5); ctx.stroke(); ctx.restore(); }       /* a red arc round the walker on the side the attack comes from: no words, and above the thumbs */
   for (const d of g.drops) { if (d.k === 'fix') continue; const sc = toScr(d.x, .8, d.z); if (sc && sc[0] > 10 && sc[0] < W - 10 && sc[1] > SAFE + 44 && sc[1] < H - 10) continue;       // salvage or an organ lying off screen: a diamond at the edge with an arrow toward it
     const col = d.k === 'organ' ? '#b6e04a' : '#f2b01e', dx = d.x - g.x, dy = d.z - g.z, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, m = 26, t = Math.min(ux > 0 ? (W - m - W / 2) / ux : ux < 0 ? (m - W / 2) / ux : 1e9, uy > 0 ? (H - m - H / 2) / uy : uy < 0 ? (SAFE + 70 - H / 2) / uy : 1e9), bob = ST.flash ? 0 : Math.sin(performance.now() / 200) * 3;
     ctx.save(); ctx.translate(W / 2 + ux * (t + bob), H / 2 + uy * (t + bob)); ctx.rotate(Math.atan2(uy, ux)); ctx.scale(1.2, 1.2); ctx.lineJoin = 'round'; ctx.fillStyle = col; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 2;
