@@ -40,7 +40,9 @@ button:disabled{opacity:.5;cursor:default}
 #partI{position:static;transform:none;width:120px;height:120px;margin:4px 0 12px}
 #partD{font-size:1.25rem;line-height:1.4;max-width:330px;margin:4px 0 12px;color:#fff}
 #partR{font-weight:700}
-#partM{text-transform:none;letter-spacing:.02em;font-size:.92rem;margin-bottom:18px}
+#overParts{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;max-width:360px;margin:0 0 16px}
+#overParts canvas{position:static;transform:none;width:44px;height:44px}
+#partD{margin-bottom:20px}
 .parts .rr{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 #night{min-height:44px;font:inherit;font-size:1rem;font-weight:600;background:#14110a;color:var(--amber);border:1px solid var(--line);padding:6px 12px;margin:2px 0 6px}
 #nightSay{font-size:.92rem;line-height:1.35;color:var(--bone);max-width:330px;margin:0 auto 10px}
@@ -66,7 +68,7 @@ button:disabled{opacity:.5;cursor:default}
 </head>
 <body>
 <main id="app">
-<canvas id="gl" role="img" aria-label="Game view. A walking machine with a headlamp and a rotary gun fights large insects on a dark concrete pad. Events and results are announced as text."></canvas>
+<canvas id="gl" role="img" aria-label="Game view. A walking machine with a headlamp and a heavy three-barrel cannon fights large insects on a dark concrete pad. Events and results are announced as text."></canvas>
 <canvas id="c" aria-hidden="true"></canvas>
 <div id="live" class="sr" aria-live="polite" aria-atomic="true"></div>
 <noscript><p style="padding:2rem">Last Light needs JavaScript to run.</p></noscript>
@@ -79,7 +81,7 @@ button:disabled{opacity:.5;cursor:default}
     <h1>Last<br>Light</h1>
   </div>
   <div>
-    <ul class="how">
+    <ul class="how" id="howTo">
       <li>Hold the pad for six minutes. Drag to walk; the gun aims itself.</li>
       <li>Dash to ram through. Red on the ground is about to hurt.</li>
     </ul>
@@ -110,7 +112,7 @@ button:disabled{opacity:.5;cursor:default}
 <div class="scr top" id="over" role="dialog" aria-modal="true" aria-labelledby="overT">
   <h2 id="overT">Wrecked</h2>
   <div id="stats"></div>
-  <ul id="overParts" class="parts" aria-label="Parts fitted this run"></ul>
+  <div id="overParts" role="group" aria-label="Parts fitted this run"></div>
   <button id="againBtn" class="go" data-autofocus>Again</button>
   <button id="setBtn3" class="alt">Settings &amp; accessibility</button>
 </div>
@@ -120,7 +122,6 @@ button:disabled{opacity:.5;cursor:default}
   <canvas id="partI" width="192" height="192" aria-hidden="true"></canvas>
   <h2 id="partN">Part</h2>
   <p id="partD"></p>
-  <p id="partM" class="tag"></p>
   <button id="partOk" class="go">Continue</button>
 </div>
 

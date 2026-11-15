@@ -57,11 +57,21 @@ function sphMesh(nu, nv) { const B = meshBuilder(), p = (u, v) => { const th = v
   for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) { const a = p(i / nu, j / nv), b = p((i + 1) / nu, j / nv), c = p((i + 1) / nu, (j + 1) / nv), d = p(i / nu, (j + 1) / nv); if (j > 0) B.tri(a, b, c, nr(a), nr(b), nr(c)); if (j < nv - 1) B.tri(a, c, d, nr(a), nr(c), nr(d)); }
   return B; }
 
+/* faceted meshes for living things: every face is flat, so chitin reads as hard plates with sharp edges, not as balls */
+function facet(B, a, b, c) { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2], nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, mx = a[0] + b[0] + c[0], my = a[1] + b[1] + c[1], mz = a[2] + b[2] + c[2]; if (nx * mx + ny * my + nz * mz < 0) B.tri(a, c, b); else B.tri(a, b, c); }      // wound so the face looks away from the middle of the shape
+function octMesh() { const B = meshBuilder(), X = [.5, 0, 0], x = [-.5, 0, 0], Y = [0, .5, 0], y = [0, -.5, 0], Z = [0, 0, .5], z = [0, 0, -.5]; for (const a of [X, x]) for (const b of [Y, y]) for (const c of [Z, z]) facet(B, a, b, c); return B; }
+function spindleMesh(n, prof) { const B = meshBuilder(), ring = k => { const [zz, r] = prof[k], o = []; for (let i = 0; i < n; i++) { const a = (i + (k % 2) * .5) / n * TAU; o.push([Math.cos(a) * r, Math.sin(a) * r, zz]); } return o; };      // a seed shape turned on its long axis, each ring half a step round from the last so the faces are triangles
+  for (let k = 0; k < prof.length - 1; k++) { const A = ring(k), C = ring(k + 1), o = k % 2; for (let i = 0; i < n; i++) { const j = (i + 1) % n; if (prof[k][1] === 0) facet(B, A[0], C[i], C[j]); else if (prof[k + 1][1] === 0) facet(B, A[i], A[j], C[0]); else { const p = o ? i : (i + n - 1) % n, q = o ? j : i; facet(B, A[i], A[j], C[o ? i : i]); facet(B, A[o ? j : i], C[q], C[p]); } } } return B; }
+function prismMesh(n, r0, r1) { const B = meshBuilder(), P = (i, yy, r) => { const a = i / n * TAU; return [Math.cos(a) * r, yy, Math.sin(a) * r]; }; for (let i = 0; i < n; i++) { const a = P(i, -.5, r0), b = P(i + 1, -.5, r0), c = P(i + 1, .5, r1), d = P(i, .5, r1); if (r1 > 0) { facet(B, a, b, c); facet(B, a, c, d); facet(B, [0, .5, 0], d, c); } else facet(B, a, b, [0, .5, 0]); facet(B, [0, -.5, 0], a, b); } return B; }
+function bladeMesh() { const B = meshBuilder(), st = []; for (let k = 0; k <= 4; k++) { const u = k / 4, yy = u - .5, zc = .34 * u * u, hw = .2 * (1 - u * u) + .0, th = .07 * (1 - u * .8); st.push(k === 4 ? [[0, yy, zc]] : [[th, yy, zc], [0, yy, zc + hw], [-th, yy, zc], [0, yy, zc - hw * .55]]); }      // a hooked claw with a sharp inner and outer edge
+  const tri = (a, b, c) => { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2], nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, cy2 = (a[1] + b[1] + c[1]) / 3, u2 = cy2 + .5, zc = .34 * u2 * u2, mx = (a[0] + b[0] + c[0]) / 3, mz = (a[2] + b[2] + c[2]) / 3 - zc; if (nx * mx + nz * mz < 0) B.tri(a, c, b); else B.tri(a, b, c); };
+  for (let k = 0; k < 4; k++) for (let i = 0; i < 4; i++) { const a = st[k][i], b = st[k][(i + 1) % 4]; if (k === 3) tri(a, b, st[4][0]); else { tri(a, b, st[k + 1][(i + 1) % 4]); tri(a, st[k + 1][(i + 1) % 4], st[k + 1][i]); } } B.tri(st[0][0], st[0][2], st[0][1]); B.tri(st[0][0], st[0][3], st[0][2]); return B; }
+
 /* ---------- shaders ---------- */
 const GLSL_LIGHT = `
 precision highp float; precision highp sampler2DShadow;
 uniform vec3 uCam, uFocus, uSpotP, uSpotD, uSpotC, uAmbS, uAmbG, uMoonD, uMoonC, uFogC; uniform vec2 uSpotK, uFogR; uniform mat4 uSpotVP; uniform sampler2DShadow uSh;
-uniform vec4 uPL[6]; uniform vec3 uPC[6]; uniform float uExp;
+uniform vec4 uPL[6]; uniform vec3 uPC[6], uRim; uniform float uExp;
 vec3 lightAll(vec3 P, vec3 N, vec3 alb, float sp) {
   vec3 V = normalize(uCam - P), c = alb * mix(uAmbG, uAmbS, N.y * .5 + .5) + alb * uMoonC * max(dot(N, uMoonD), 0.);
   vec3 L = uSpotP - P; float d = length(L); L /= d; float cone = smoothstep(uSpotK.x, uSpotK.y, dot(-L, uSpotD));
@@ -69,6 +79,7 @@ vec3 lightAll(vec3 P, vec3 N, vec3 alb, float sp) {
     sh += texture(uSh, vec3(s.xy + vec2(-ts, -ts), s.z - .0012)); sh += texture(uSh, vec3(s.xy + vec2(ts, -ts), s.z - .0012)); sh += texture(uSh, vec3(s.xy + vec2(-ts, ts), s.z - .0012)); sh += texture(uSh, vec3(s.xy + vec2(ts, ts), s.z - .0012)); sh *= .25;
     float nl = max(dot(N, L), 0.); vec3 H = normalize(L + V); c += uSpotC * at * sh * (alb * nl + sp * pow(max(dot(N, H), 0.), 36.) * nl); }
   for (int i = 0; i < 6; i++) { vec3 Lp = uPL[i].xyz - P; float dp = length(Lp); float at = max(1. - dp / uPL[i].w, 0.); at *= at; if (at > 0.) { Lp /= dp; float nl = max(dot(N, Lp), 0.) * .85 + .15; vec3 H = normalize(Lp + V); c += uPC[i] * at * (alb * nl + sp * pow(max(dot(N, H), 0.), 24.) * .6); } }
+  float rim = pow(1. - max(dot(N, V), 0.), 3.) * clamp(N.y * .7 + .45, 0., 1.); c += uRim * rim * (.35 + sp);
   return c; }
 vec3 finish(vec3 c, vec3 P) { float f = smoothstep(uFogR.x, uFogR.y, length(P.xz - uFocus.xz)); c = mix(c, uFogC, f); c = 1. - exp(-c * uExp); return pow(c, vec3(.4545)); }
 `;
@@ -152,6 +163,7 @@ function initGL(canvas) {
   gl = canvas.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' }); if (!gl) return false;
   PROG.lit = prog(VS_LIT, FS_LIT); PROG.depth = prog(VS_DEPTH, FS_DEPTH); PROG.ground = prog(VS_GROUND, FS_GROUND); PROG.part = prog(VS_PART, FS_PART); PROG.decal = prog(VS_DECAL, FS_DECAL);
   MESH.cube = makeMesh(cubeMesh(.07)); MESH.cyl = makeMesh(cylMesh(14, 1)); MESH.cone = makeMesh(cylMesh(12, 0)); MESH.sph = makeMesh(sphMesh(14, 9));
+  MESH.oct = makeMesh(octMesh()); MESH.shell = makeMesh(spindleMesh(7, [[-.5, 0], [-.28, .34], [.04, .5], [.32, .36], [.5, 0]])); MESH.taper = makeMesh(prismMesh(5, .5, .22)); MESH.spike = makeMesh(prismMesh(4, .5, 0)); MESH.blade = makeMesh(bladeMesh());
   quadBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
   groundVAO = gl.createVertexArray(); gl.bindVertexArray(groundVAO); gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); gl.bindVertexArray(null);
   PADD = instVAO([3, 2, 3, 4], 900); PSMK = instVAO([3, 2, 3, 4], 300); DEC = instVAO([4, 4, 4], 400);
@@ -188,13 +200,13 @@ function decal(x, z, sx, sz, rot, kind, r, g, b, a, lift, seed) { if (DEC.n >= D
 const VP = new Float32Array(16), VIEW = new Float32Array(16), PROJ = new Float32Array(16), SVP = new Float32Array(16), SV = new Float32Array(16), SPJ = new Float32Array(16);
 const PLv = new Float32Array(24), PCv = new Float32Array(18);
 function setLightUniforms(p, S) { const u = p.u; gl.uniform3fv(u.uCam, S.cam); gl.uniform3fv(u.uFocus, S.focus); gl.uniform3fv(u.uSpotP, S.spotP); gl.uniform3fv(u.uSpotD, S.spotD); gl.uniform3fv(u.uSpotC, S.spotC); gl.uniform2f(u.uSpotK, S.spotCos[0], S.spotCos[1]);
-  gl.uniformMatrix4fv(u.uSpotVP, false, SVP); gl.uniform1i(u.uSh, 0); gl.uniform4fv(u.uPL, PLv); gl.uniform3fv(u.uPC, PCv); gl.uniform3fv(u.uAmbS, S.ambS); gl.uniform3fv(u.uAmbG, S.ambG); gl.uniform3fv(u.uMoonD, S.moonD); gl.uniform3fv(u.uMoonC, S.moonC); gl.uniform3fv(u.uFogC, S.fogC); gl.uniform2f(u.uFogR, S.fogR[0], S.fogR[1]); gl.uniform1f(u.uExp, S.exposure); gl.uniformMatrix4fv(u.uVP, false, VP); }
+  gl.uniformMatrix4fv(u.uSpotVP, false, SVP); gl.uniform1i(u.uSh, 0); gl.uniform4fv(u.uPL, PLv); gl.uniform3fv(u.uPC, PCv); gl.uniform3fv(u.uAmbS, S.ambS); gl.uniform3fv(u.uAmbG, S.ambG); gl.uniform3fv(u.uMoonD, S.moonD); gl.uniform3fv(u.uMoonC, S.moonC); gl.uniform3fv(u.uFogC, S.fogC); gl.uniform2f(u.uFogR, S.fogR[0], S.fogR[1]); gl.uniform1f(u.uExp, S.exposure); gl.uniform3fv(u.uRim, S.rim); gl.uniformMatrix4fv(u.uVP, false, VP); }
 function renderScene(S, W, H) {
   // S: { cam[3], at[3], fov, focus[3], spotP, spotD, spotC, spotCos[2], lights[{p,c,r}], amb..., exposure }
   M4.persp(PROJ, S.fov, W / H, 1, 160); M4.look(VIEW, S.cam[0], S.cam[1], S.cam[2], S.at[0], S.at[1], S.at[2], 0, 1, 0); M4.mul(VP, PROJ, VIEW);
   const sd = S.spotD, upx = Math.abs(sd[1]) > .95 ? 1 : 0; M4.persp(SPJ, S.spotFov, 1, .6, 52); M4.look(SV, S.spotP[0], S.spotP[1], S.spotP[2], S.spotP[0] + sd[0], S.spotP[1] + sd[1], S.spotP[2] + sd[2], upx, 1 - upx, 0); M4.mul(SVP, SPJ, SV);
   PLv.fill(0); PCv.fill(0); S.lights.slice(0, 6).forEach((L, i) => { PLv[i * 4] = L.p[0]; PLv[i * 4 + 1] = L.p[1]; PLv[i * 4 + 2] = L.p[2]; PLv[i * 4 + 3] = L.r; PCv[i * 3] = L.c[0]; PCv[i * 3 + 1] = L.c[1]; PCv[i * 3 + 2] = L.c[2]; });
-  const meshes = [MESH.cube, MESH.cyl, MESH.cone, MESH.sph];
+  const meshes = Object.values(MESH);
   for (const m of meshes) { gl.bindBuffer(gl.ARRAY_BUFFER, m.ib); gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.inst, 0, m.n * 20); }
   // shadow pass: what the headlamp sees
   gl.bindFramebuffer(gl.FRAMEBUFFER, shadowFB); gl.viewport(0, 0, SH, SH); gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND); gl.clear(gl.DEPTH_BUFFER_BIT); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2, 4); gl.disable(gl.CULL_FACE);
