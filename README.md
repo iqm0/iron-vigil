@@ -7,7 +7,7 @@ Static site, no build step and no libraries: `index.html`, `js/engine.js` (a sma
 ## How it plays
 
 - **Hold the pad for six minutes**, until relief arrives. The clock at the top counts down. Holding a night opens the next one.
-- **Drag anywhere** to walk. The cannon picks its own targets and fires while you move: the torso turns to the target on its own ring while the legs go where your thumb says. It fires three heavy shells a second. A shell kills an early bug outright, tears a leg off one it does not kill, and carries on through into the next bug with a third less force.
+- **Drag anywhere** to walk. The cannon picks its own targets and fires while you move: the torso turns to the target on its own ring while the legs go where your thumb says. It fires three heavy shells a second and reaches about as far as the lamp shows, so bugs come into view and close in before they die. A shell kills the first bugs outright, tears a leg off one it does not kill, and carries on through into the next bug with a third less force. Its weight is shown on the walker and on the bugs; it does not shake the screen.
 - **Dash** with the button (tap it, or drag it to aim). The thrusters fire, the ram plate comes forward, and anything in the way is thrown aside. You cannot be hurt during the burst.
 - **A red lane on the ground is a lunge about to land.** A bug rears up, the lane shows where it will go, and half a second later it leaps. Lunges are aimed at where you are heading, so change direction or dash across. Amber rings are your own mortar shells coming down.
 - **A red ring is acid about to land** (from night two). Spitters keep their distance and lob it at where you are heading; the pool stays for a few seconds.
