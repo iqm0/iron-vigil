@@ -1,10 +1,10 @@
 // Staged frames of the encounter at two phone sizes from a fixed seed; time is stepped by hand, so the same frames come out each run.
 // usage: node tests/shots.js [outdir]      (default tests/out, not committed)
-const { chromium } = require('playwright'), path = require('path'), fs = require('fs');
+const { chromium } = require('./browser'), path = require('path'), fs = require('fs');
 const out = path.resolve(process.argv[2] || path.join(__dirname, 'out')); fs.mkdirSync(out, { recursive: true });
 (async () => { const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const errs = [];
   for (const [w, h] of [[412, 880], [360, 780]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 }); p.on('pageerror', e => errs.push(e.message.slice(0, 300)));
-    await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(700); await p.evaluate(() => { window.requestAnimationFrame = () => 0; }); await p.waitForTimeout(100);
+    await p.goto(require('./browser').gameURL()); await p.waitForTimeout(700); await p.evaluate(() => { window.requestAnimationFrame = () => 0; }); await p.waitForTimeout(100);
     const ev = js => p.evaluate(js), shot = async n => { await ev(`render()`); await p.screenshot({ path: path.join(out, `${w}_${n}.png`) }); };
     await ev(`window.S=n=>{for(let i=0;i<n;i++){if(!window.gun)G.fireT=9;if(window.safe)G.inv=9;step(1/60);if(window.camAt){G.cam.x=camAt[0];G.cam.z=camAt[1];}}};
       window.put=(x,z,a)=>{const ox=x-G.x,oz=z-G.z;G.x=x;G.z=z;G.feet.forEach(f=>{f.x+=ox;f.z+=oz;});if(a!==undefined)G.head=G.aim=G.gunA=G.lamp=a;};

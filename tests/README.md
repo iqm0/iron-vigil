@@ -51,3 +51,31 @@ node design/blockouts/sheet.js
 Renders the three walker blockouts and the walker in the game as flat black silhouettes and lit, in four poses, at the game's camera.
 
 Hooks the game exposes: `setSeed(n)`, `advanceTime(ms)`, `render_game_to_text()`. `?seed=7` in the address repeats a run; `?camera=46` uses the steeper camera for comparison; `?fps` shows the frame counter and what each frame drew.
+
+## Reproducible takeover baseline
+
+`node tests/baseline.js [output-directory]` runs all nine commands above in
+sequence, including both camera angles, three bot seeds and all mutants. It saves
+complete logs and `results.json` with command exits, elapsed times and environment.
+The default output is ignored under `tests/out/baseline/`. It returns nonzero if
+any command crashes, times out, reports a failed check or reports page errors.
+Measurements and bots remain measurements, not experience acceptance tests.
+
+By default the tests use Playwright's installed Chromium and file URLs. In a
+managed environment with an installed browser and blocked file URLs, use:
+
+```bash
+LAST_LIGHT_CHROMIUM=/usr/bin/chromium LAST_LIGHT_HTTP=1 node tests/baseline.js
+```
+
+The HTTP option serves the checkout on an ephemeral loopback port, including each
+mutation's own temporary checkout. Browser launch failures must fail the baseline;
+they must never be interpreted as an unbroken game passing the mutation checks.
+
+`node tests/record.js [output-directory]` records a scripted real-time keyboard run
+at 360×780 and 412×880, seed 7. It writes WebM, final PNG and JSON containing wall
+and game clocks, final state and browser errors. It does not record audio, perform
+a human playtest or guarantee a win. Software rendering and recording overhead can
+slow the simulation; do not use this clip to measure reaction time or device FPS.
+The same browser environment options apply. Retain these files as the before set
+and repeat after changing assets.

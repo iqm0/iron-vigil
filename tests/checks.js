@@ -1,7 +1,7 @@
 // Scripted checks of the rules the encounter depends on. Each prints PASS or FAIL. usage: node tests/checks.js
-const { chromium } = require('playwright'), path = require('path');
+const { chromium } = require('./browser'), path = require('path');
 (async () => { const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }), p = await b.newPage({ viewport: { width: 412, height: 880 } }); const errs = []; p.on('pageerror', e => errs.push(e.message.slice(0, 300)));
-  await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(600); await p.evaluate(() => { window.requestAnimationFrame = () => 0; }); await p.waitForTimeout(100);
+  await p.goto(require('./browser').gameURL()); await p.waitForTimeout(600); await p.evaluate(() => { window.requestAnimationFrame = () => 0; }); await p.waitForTimeout(100);
   const R = await p.evaluate(() => { const out = [], ok = (n, c, d) => out.push((c ? 'PASS ' : 'FAIL ') + n + (d !== undefined ? '  [' + d + ']' : '')), run = n => { for (let i = 0; i < n; i++) step(1 / 60); };
     const fresh = () => { setSeed(5); startGame(); G.enc.wave = 9; G.enc.due = 1e9; G.s.range = 0; G.fireT = 1e9; }, bug = (dx, dz, st) => { const e = spawnShear(G.x + dx, G.z + dz, Math.atan2(-dx, -dz)); e.state = st || 'stalk'; e.cd = 9; e.st = st === 'tell' ? .6 : 2; e.sprint = -9; e.pause = 99; return e; }, shell = (e, n) => { for (let i = 0; i < (n || 1); i++) hurtBug(e, G.s.dmg, 0, -1, false, true); };
     // the same seed plays the same run
@@ -27,4 +27,4 @@ const { chromium } = require('playwright'), path = require('path');
     // waves: one, two, three, three, then it is over
     setSeed(9); startGame(); const seen = []; let last = 0, guard = 0; while (state === 'play' && guard++ < 40000) { if (G.enc.wave !== last) { last = G.enc.wave; } for (const q of G.en) hurtBug(q, 1e6, 0, 1, true); if (G.drops.length) G.drops.length = 0; step(1 / 60); } ok('four waves, nine animals, then the yard is held', G.won > 0 && G.kills === 9 && G.enc.wave === 4, G.kills + ' kills, wave ' + G.enc.wave);
     return out; });
-  for (const l of R) console.log(l); console.log(R.filter(l => l.startsWith('FAIL')).length + ' failed of ' + R.length, '· page errors:', errs.length, errs.slice(0, 2)); await b.close(); })();
+  for (const l of R) console.log(l); console.log(R.filter(l => l.startsWith('FAIL')).length + ' failed of ' + R.length, '· page errors:', errs.length, errs.slice(0, 2)); await b.close(); process.exitCode = R.some(l => l.startsWith('FAIL')) || errs.length ? 1 : 0; })();

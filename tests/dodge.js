@@ -2,9 +2,9 @@
 // usage: node tests/dodge.js            prints tables; writes nothing
 // The walker starts at rest. The animal winds up. After a reaction delay counted from the first frame of the wind-up, the stick is pushed and held.
 // "hit" is the game's rule (hull). "brush" is no damage but the bodies overlap on screen. "clear" is daylight between them.
-const { chromium } = require('playwright'), path = require('path');
+const { chromium } = require('./browser'), path = require('path');
 (async () => { const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }), p = await b.newPage({ viewport: { width: 412, height: 880 } }); const errs = []; p.on('pageerror', e => errs.push(e.message.slice(0, 300)));
-  await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(600); await p.evaluate(() => { window.requestAnimationFrame = () => 0; });
+  await p.goto(require('./browser').gameURL()); await p.waitForTimeout(600); await p.evaluate(() => { window.requestAnimationFrame = () => 0; });
   const R = await p.evaluate(() => {
     const fresh = () => { setSeed(5); startGame(); G.enc.wave = 9; G.enc.due = 1e9; G.s.range = 0; G.fireT = 1e9; G.x = 0; G.z = -4; G.vx = G.vz = G.pvx = G.pvz = 0; G.inv = 0; G.cam.x = 0; G.cam.z = -4; stick = null; },
       bug = (dx, dz) => { const e = spawnShear(G.x + dx, G.z + dz, Math.atan2(-dx, -dz)); e.state = 'stalk'; e.cd = 0; e.st = 2; e.sprint = -9; e.pause = 99; return e; },

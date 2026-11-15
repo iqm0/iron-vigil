@@ -2,14 +2,14 @@
    Run from repository root: node tests/approved-slice-checks.js
    Requires existing Playwright dependency (same as tests/checks.js).
 */
-const { chromium } = require('playwright');
+const { chromium } = require('./browser');
 const path = require('path');
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist'] });
   const page = await browser.newPage({viewport: {width: 412,height: 880}, isMobile:true, hasTouch:true});
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  await page.goto('file://' + path.resolve(__dirname,'../index.html'));
+  await page.goto(require('./browser').gameURL());
   await page.waitForTimeout(750);
   await page.evaluate(() => { window.requestAnimationFrame = () => 0; });
   const cases = await page.evaluate(() => {

@@ -1,8 +1,8 @@
 // Checks of what happens, not of what a constant is set to. usage: node tests/behaviour.js [--camera=46]
 // Each one drives the game and reads the result. tests/mutants.js breaks the game on purpose and confirms these notice.
-const { chromium } = require('playwright'), path = require('path'); const cam46 = process.argv.includes('--camera=46');
+const { chromium } = require('./browser'), path = require('path'); const cam46 = process.argv.includes('--camera=46');
 (async () => { const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }), p = await b.newPage({ viewport: { width: 412, height: 880 }, hasTouch: true }); const errs = []; p.on('pageerror', e => errs.push(e.message.slice(0, 300)));
-  await p.goto('file://' + path.resolve(__dirname, '../index.html') + (cam46 ? '?camera=46' : '')); await p.waitForTimeout(600); await p.evaluate(() => { window.requestAnimationFrame = () => 0; }); await p.waitForTimeout(100);
+  await p.goto(require('./browser').gameURL() + (cam46 ? '?camera=46' : '')); await p.waitForTimeout(600); await p.evaluate(() => { window.requestAnimationFrame = () => 0; }); await p.waitForTimeout(100);
   const R = await p.evaluate(() => { const out = [], ok = (n, c, d) => out.push((c ? 'PASS ' : 'FAIL ') + n + (d !== undefined ? '  [' + d + ']' : '')), run = (n, hz) => { for (let i = 0; i < n; i++) step(1 / (hz || 60)); };
     const fresh = () => { setSeed(5); startGame(); G.enc.wave = 9; G.enc.due = 1e9; G.s.range = 0; G.fireT = 1e9; G.x = 0; G.z = -4; G.vx = G.vz = G.pvx = G.pvz = 0; G.inv = 0; G.cam.x = 0; G.cam.z = -4; G.cam.d = 1; G.tgt = null; G.dash = null; G.dcd = 0; stick = null; dbtn = null; render(); },
       bug = (dx, dz, st) => { const e = spawnShear(G.x + dx, G.z + dz, Math.atan2(-dx, -dz)); e.state = st || 'stalk'; e.cd = 9; e.st = st === 'stuck' ? 5 : 2; e.sprint = -9; e.pause = 99; return e; }, hold = (x, z) => { stick = { id: 1, ox: 0, oy: 0, dx: x, dy: z, ux: x, uy: z, d: 60 }; };
