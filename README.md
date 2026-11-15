@@ -1,55 +1,54 @@
 # Last Light
 
-A portrait, one-thumb survivors game in the old isometric style. An armoured figure with a burning staff holds out in an antlion nest for six minutes, until dawn.
+A portrait, one-thumb survivors game in real 3D. You drive a yellow scrap walker with a work lamp, a rotary gun and a ram plate, on a dark concrete pad full of large bugs. Runs last until the hull gives out.
 
-**The rule the game hangs on:** your staff only hits what stands in the light. You carry a circle of light, braziers give more, and everything outside it is faster than you and cannot be hit.
-
-Static site: `index.html` plus the atlases in `assets/` (about 5 MB). No build step to play. Add `?fps` to the URL for a frame counter.
-
-## Art and licence
-
-All sprites, tiles and effects are from the open-source [FLARE](https://flarerpg.org/) project ([flareteam/flare-game](https://github.com/flareteam/flare-game)), licensed **CC-BY-SA 3.0**. They are pre-rendered isometric sprites in the Diablo II tradition. See [CREDITS.md](CREDITS.md) for attribution and what was used. Because the licence is share-alike, the files in `assets/` stay CC-BY-SA 3.0.
-
-`tools/build_assets.py` repacks the FLARE sheets into the atlases (it needs the raw files from the FLARE repository and Pillow).
-
-Two earlier versions are kept for reference: the first prototype under [`legacy/`](legacy/), and a flat vector version in the git history.
+Static site, no build step and no libraries: `index.html`, `js/engine.js` (a small WebGL2 renderer) and `js/game.js`. Add `?fps` to the URL for a frame counter.
 
 ## How it plays
 
-- **Drag anywhere** to walk. **Dash** with the button (drag it to aim, or tap). Keyboard: WASD or arrows, Space or Shift to dash, P to pause.
-- **Let go to cast.** While you stand still the hero turns to the nearest ant inside the light and casts fire bolts. While you run, you do not cast. Ants in the light are slowed. Ants in the dark outrun you.
-- **Red ground with a dashed edge is an attack about to land.** Step off it or dash through.
-- Kills drop gold. Enough gold gives a choice of three boons. Each boon also mends a little life.
-- The more ants are alive, the faster the whole swarm moves. Running without killing gets you run down.
-- In the last half minute the light spreads outward. That is dawn.
+- **Drag anywhere** to walk. The gun picks its own targets and fires while you move: the torso turns to the target on its own ring while the legs go where your thumb says.
+- **Dash** with the button (tap it, or drag it to aim). The thrusters fire, the ram plate comes forward, and anything in the way is thrown aside. You cannot be hurt during the burst.
+- **A red lane on the ground is a lunge about to land.** A bug rears up, the lane shows where it will go, and half a second later it leaps. Lunges are aimed at where you are heading, so change direction or dash across.
+- Only a few bugs may attack at once. The rest circle and wait, so being surrounded is a warning, not an instant loss.
+- Keyboard: WASD or arrows, Space or Shift to dash, P or Esc to pause, M to mute.
 
-## Ants
+## Parts
 
-| Ant | What it does |
+The walker starts bare. Bugs sometimes drop a part, and it bolts itself on when you walk over it. Green cells repair the hull.
+
+| Rarity | Parts |
 |---|---|
-| **Ant** (small, green) | Rushes you, crouches, then lunges along a marked lane aimed at where you are heading. It stands still before and after |
-| **Fire ant** (orange) | Hangs back and spits acid at where you are heading. The landing spot is marked |
-| **Antlion** (large, dark) | Charges down a long marked lane, trampling its own swarm. It reels afterwards and takes double damage |
+| Common | Tungsten Rounds, Belt Feeder, Servo Grease, Weld Kit, Scrap Plating, Coolant Lines, Scrap Magnet |
+| Rare | Piercing Rounds, Searing Lamp, Afterburner, Shock Plating |
+| Epic | Breaching Rounds, Ram Charger, Volatile Light |
 
-## Boons
+Parts you have found are remembered on the device. Each new run starts with one of them, picked at random.
 
-- **Staff:** Forked Flame, Heavy Ember, Quick Hands, Lancing Fire, Bursting Bolts
-- **Light:** Brighter Flame, Searing Light, Fire Nova
-- **Body:** Light Feet, Tempered Plate, Greed
+## How it is drawn and animated
+
+- Everything solid is an instance of one of four meshes (bevelled box, cylinder, cone, sphere), lit per pixel. The work lamp is a real spotlight with a shadow map; fires, the gun and the thrusters are point lights.
+- Nothing is keyframed. Feet are planted on the ground and step when the body has moved far enough; knees are solved to reach them. Lean, recoil, the gun's kick, the ram arm and the antenna are springs. Bugs walk on two alternating tripods of legs the same way.
+- The ground texture is painted once at start-up, so each frame costs two texture lookups for it.
+- The 3D view is capped at 1.5 million pixels and drops its resolution, never its frame rate, if the device falls behind.
 
 ## Accessibility
 
 In **Settings & accessibility** on the title, pause and end screens, saved on the device. Defaults follow `prefers-reduced-motion` and `prefers-contrast`.
 
-- **Motion and flashing:** screen shake, hit-stop, reduce flashing, bodies on or off.
-- **Vision and text:** darkness brightness, high-contrast mode (a lighter dark, pale bold attack marks, thicker bars), text size up to 200%, numbers for life and dash, edge arrows for off-screen antlions and fire ants, event captions.
+- **Motion and flashing:** screen shake, hit-stop, reduce flashing, remains on or off. The gun lights the scene with a steady glow, not a flash per shot.
+- **Vision and text:** darkness brightness, high-contrast mode (paler glowing bugs, bolder lunge lanes, thicker bars), text size up to 200%, numbers for hull and dash, event captions.
 - **Audio and haptics:** master, effects and music volume, vibration.
 - **Controls:** dash button side and size, fixed or floating joystick, dead zone.
-- **Assists:** game speed down to 55%, damage taken, ant speed, number of ants. Changeable mid-run.
-- **Menus:** semantic dialogs, keyboard operable, focus managed, events announced to screen readers. The title, settings, pause, boon and end screens pass axe-core (WCAG 2.2 AA and best practice) with no violations.
+- **Assists:** game speed down to 55%, damage taken, bug speed, number of bugs. Changeable mid-run.
+- **Menus:** semantic dialogs, keyboard operable, focus managed, events and pickups announced to screen readers. The title, settings, pause, play and end screens pass axe-core (WCAG 2.2 AA and best practice) with no violations.
 
 Not done: the action itself is visual and is not playable by screen reader; there is no key remapping; it has not been tested with disabled players.
 
 ## Status
 
-Difficulty was tuned against scripted bots, not people. Frame rate and load time on real phones have not been measured.
+Checked in headless Chromium only, by stepping the game and looking at frames, and by scripted players. It has not been played by a person or run on a phone, so frame rate on real devices and whether the difficulty is right are unknown. `window.advanceTime(ms)` and `window.render_game_to_text()` exist for automated checks.
+
+## Earlier versions
+
+- [`flare/`](flare/): the previous 2D build using sprites from the FLARE project (CC-BY-SA 3.0, see [`flare/CREDITS.md`](flare/CREDITS.md)).
+- [`legacy/`](legacy/): the first prototype.

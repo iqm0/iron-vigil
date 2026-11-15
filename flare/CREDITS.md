@@ -2,7 +2,7 @@
 
 ## Art
 
-All sprites, tiles and visual effects in `assets/` come from **FLARE** (Free Libre Action Roleplaying Engine), the `flare-game` project:
+All sprites, tiles and visual effects in `assets/` (this folder) come from **FLARE** (Free Libre Action Roleplaying Engine), the `flare-game` project:
 https://github.com/flareteam/flare-game — https://flarerpg.org/
 
 They are licensed **Creative Commons Attribution-ShareAlike 3.0 Unported (CC-BY-SA 3.0)**:
@@ -29,7 +29,7 @@ Because the licence is share-alike, the files in `assets/` are themselves licens
 
 ## Code
 
-The game code (`index.html`, `tools/`) was written for this project and is not derived from FLARE's engine.
+The game code in this folder (`index.html`, `tools/`) was written for this project and is not derived from FLARE's engine.
 
 ## Sound
 
