@@ -109,8 +109,8 @@ void main() { vec2 uv = vP.xz / ${GT}.; vec4 a = texture(uGA, uv); vec2 n = text
   /* A farmyard, not a slab: packed dirt worn pale where it is walked on, a concrete apron only at the shed door, a gravel track with two ruts running out through the gate,
      a road down the east side, a grass verge, and ploughed soil beyond with its furrows running north to south. No detail smaller than a bug. */
   float dy = inside(uYard, vP.xz), ap = 1. - smoothstep(-.25, .25, inside(uApron, vP.xz)), tx = abs(vP.x - uTrack.x), tr = (1. - smoothstep(uTrack.y - .35, uTrack.y + .35, tx)) * step(uApron.w - .5, vP.z), rut = 1. - smoothstep(.1, .34, abs(tx - .8));
-  float rd = 1. - smoothstep(1.4, 1.9, abs(vP.x - uTrack.z)), verge = smoothstep(-.5, .3, dy + (mid - .5) * .6), soil = smoothstep(1.3, 2.1, dy + (big - .5)), fur = sin(vP.x * 3.9 + sin(vP.z * .21) * .7);
-  vec3 dirt = vec3(.125, .115, .1) * (.8 + .45 * big) * (1. + .22 * smoothstep(-3., -9., dy)), grav = vec3(.17, .167, .16) * (.82 + .3 * mid) * (1. - .4 * rut), grass = vec3(.05, .072, .034) * (.7 + .6 * mid), earth = vec3(.075, .058, .042) * (.75 + .4 * big) * (.8 + .2 * fur);
+  float rd = 1. - smoothstep(1.4, 1.9, abs(vP.x - uTrack.z)), verge = smoothstep(-3.4, .3, dy + (mid - .5) * 4.2 + (big - .5) * 2.), soil = smoothstep(1.3, 2.1, dy + (big - .5)), fur = sin(vP.x * 3.9 + sin(vP.z * .21) * .7);
+  vec3 dirt = vec3(.105, .08, .056) * (.66 + .62 * big) * (.9 + .2 * mid) * (1. + .3 * smoothstep(-3., -9., dy)), grav = vec3(.17, .167, .16) * (.82 + .3 * mid) * (1. - .4 * rut), grass = vec3(.045, .07, .03) * (.7 + .6 * mid), earth = vec3(.075, .058, .042) * (.75 + .4 * big) * (.8 + .2 * fur);
   vec3 alb = mix(dirt, grav, tr); alb = mix(alb, grass, verge); alb = mix(alb, earth, soil); alb = mix(alb, grav, rd * verge); alb = mix(alb, a.rgb * a.rgb, ap);
   float sp = mix(.03, a.a, ap); n = mix(n * .2, n, ap); n = mix(n, vec2(-cos(vP.x * 3.9 + sin(vP.z * .21) * .7) * .5, 0.), soil * (1. - rd));
   vec3 N = normalize(vec3(n.x, 1., n.y)); o = vec4(finish(lightAll(vP, N, alb, sp), vP), 1.); }`;
