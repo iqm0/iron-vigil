@@ -36,4 +36,4 @@ const { chromium } = require('./browser'), path = require('path');
   console.log('\nwrong answers:'); for (const r of R.wrong) console.log(`  ${r.move.padEnd(7)} after ${r.delay} ms   hit ${r.hit}/${r.of}`);
   console.log('\nframe rate, walker parked off the line: first offset (m) that is not hit, by steps a second'); for (const r of R.rates) console.log(`  line at ${r.bearing} rad   ${JSON.stringify(r.edge)}   hit twice: ${r.multi}`);
   console.log('\nframe rate, walker crossing the line while the animal is in the air, from 1.2 to 9 m out:'); for (const r of R.cross) console.log(`  ${String(r.speed).padStart(2)} m/s   ${r.cases} cases   rates disagree in ${r.disagree}   hits by rate ${JSON.stringify(r.hitsAt)}   hit twice: ${r.multi}`);
-  console.log('\npage errors:', errs.length, errs.slice(0, 2)); await b.close(); })();
+  console.log('\npage errors:', errs.length, errs.slice(0, 2)); await b.close(); process.exitCode = errs.length ? 1 : 0; })();

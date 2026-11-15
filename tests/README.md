@@ -79,3 +79,13 @@ a human playtest or guarantee a win. Software rendering and recording overhead c
 slow the simulation; do not use this clip to measure reaction time or device FPS.
 The same browser environment options apply. Retain these files as the before set
 and repeat after changing assets.
+
+`node tests/replay.js [output-directory]` generates a complete ace-bot encounter
+film at both portrait sizes, using the bot policy from `sim.js`. The simulation
+steps at 60 Hz, samples images at 15 fps and encodes an MP4 at exactly 15 fps with
+system `ffmpeg` (override with `LAST_LIGHT_FFMPEG`). This preserves simulation
+playback timing even when SwiftShader renders slowly. JSON records the seed,
+frame count, simulated clock, final outcome, peak instances and page errors.
+A run that fails to reach the end within 180 simulated seconds exits nonzero.
+These are deterministic bot replays without audio or real pointer input. Compare
+animation timing here; use `record.js` to observe real browser/input timing.

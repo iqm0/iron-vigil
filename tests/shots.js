@@ -28,4 +28,4 @@ const out = path.resolve(process.argv[2] || path.join(__dirname, 'out')); fs.mkd
     await ev(`togglePause()`); await p.waitForTimeout(200); await p.screenshot({ path: path.join(out, `${w}_17_pause.png`) }); await ev(`togglePause()`);
     await ev(`G.kills=9;G.crushed=5;G.hp=62;G.t=64;endGame(true)`); await p.waitForTimeout(200); await p.screenshot({ path: path.join(out, `${w}_18_end.png`) });
     await p.close(); }
-  console.log('errors:', errs.length, errs.slice(0, 3)); await b.close(); })();
+  console.log('errors:', errs.length, errs.slice(0, 3)); await b.close(); process.exitCode = errs.length ? 1 : 0; })();

@@ -10,4 +10,4 @@ for(const bot of ['ace','dodger','stand'])for(let seed=1;seed<=+(process.argv[2]
    if(bot==='ace'&&g.dcd<=0&&!g.dash)for(const e of g.en){const ex=e.x-g.x,ez=e.z-g.z,d=Math.hypot(ex,ez);if(d<7&&(e.state==='stuck'||e.state==='down')){startDash(ex/d,ez/d);rams++;break;}}}
   stick=(dx||dz)?{id:1,ox:90,oy:700,dx,dy:dz,ux:dx,uy:dz,d:60}:null;const hp=g.hp;step(1/60);if(g.hp<hp-1)hits++;if(n%30===0){render();maxI=Math.max(maxI,STATS.inst);}}
  return {bot,seed,t:+(G.t/PACE).toFixed(0),won:!!G.won,hull:Math.round(G.hp),kills:G.kills,crushed:G.crushed,hits,rams,wave:G.enc.wave,item:G.items.join(),peakInstances:maxI};},{bot,seed});console.log(JSON.stringify(r));}
-console.log('errors:',errs.length,errs.slice(0,3));await b.close();})();
+console.log('errors:',errs.length,errs.slice(0,3));await b.close();process.exitCode=errs.length?1:0;})();
