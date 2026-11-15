@@ -1,5 +1,7 @@
 # Last Light: the single-night slice
 
+> **Superseded.** After a recording of this slice was reviewed, the game was cut back to one encounter and rebuilt round a new walker and a single enemy. See [`DIRECTION.md`](DIRECTION.md). This file describes the build on the `redesign-slice` branch.
+
 What was built from the redesign brief ([`redesign-pack/`](redesign-pack/MASTER_REDESIGN_BRIEF.md)) and the visual kit ([`visual-kit/`](visual-kit/ART_AND_WORLD_BIBLE.md)), what was changed or left out and why, and what is still unproven.
 
 **Status: implemented and machine-checked. Not playtested, not run on a phone.** Everything below marked *checked* was checked in headless Chromium by scripted tests, bots, or by looking at frames. Nothing here is evidence about how it feels.

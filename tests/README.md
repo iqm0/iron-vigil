@@ -1,20 +1,25 @@
 # Tests
 
-All three run in headless Chromium through Playwright, with WebGL2 on SwiftShader. Nothing here measures frame rate: software rendering says nothing about a phone.
+All three run in headless Chromium through Playwright, with WebGL2 on SwiftShader. Nothing here measures frame rate, and nothing here can tell you how the game feels.
 
 ```bash
 node tests/checks.js
 ```
-Twenty-five rule checks: seeds repeat, slots and exclusivity, no card multiplies base power, guard armour from the front, the back, staggered and with penetrators, the ram interrupting a wind-up, no invulnerability after the burst, burrows shutting and reopening, each organ's benefit and its cost, growth only with an organ, the mother's two phases.
+Thirty-one rule checks on the encounter: a seed repeats; nine shells kill, each a shove, none cancels a wind-up; blades come off at set health; the lane appears only for the last third of a second; standing in it costs hull and stepping off it does not; one attacker at a time until the last wave; what the ram does at each stage; a miss leaves the walker sliding with the cannon down; the one salvage choice; four waves and nine animals.
 
 ```bash
-node tests/sim.js kite,slow 2 1o
+node tests/sim.js 3
 ```
-Whole runs played by bots, stepped by hand at 60 steps a second from fixed seeds. Arguments: bots (`idle`, `circle`, `kite`, `slow`), number of seeds, which card of each pair to take (`0`, `1`, `r` for random; add `o` to accept the organ). Prints one line of JSON per run. The bots do not flank and ram only burrows, so they are a floor on what a build can do, not a measure of difficulty.
+Whole runs by three bots from fixed seeds: one that dodges and rams anything stuck, one that dodges and never rams, one that never moves. One line of JSON per run, with peak drawn instances.
 
 ```bash
 node tests/shots.js
 ```
-Seventeen staged frames at 412×880 and 360×780 from a fixed seed, written to `tests/out/` (not committed): title, start, salvage, both choice panels, a fitted module, a grown organ, the relay, a burrow open and shut, the guard walking and staggered, the mother in both phases, pause, and the end screen.
+Eighteen staged frames at 412×880 and 360×780, written to `tests/out/` (not committed). A selection is in `screenshots/`.
 
-Hooks the game exposes for these: `setSeed(n)`, `advanceTime(ms)`, `render_game_to_text()` (state, seed, items, choices, the current offer, and what the last frame drew: instances, batches, sprites, decals). `?seed=7` in the address does the same as `setSeed(7)`; `?fps` shows the frame counter with the same draw counts.
+```bash
+node design/blockouts/sheet.js
+```
+Renders the three walker blockouts and the walker in the game as flat black silhouettes and lit, in four poses, at the game's camera.
+
+Hooks the game exposes: `setSeed(n)`, `advanceTime(ms)`, `render_game_to_text()`. `?seed=7` in the address repeats a run; `?fps` shows the frame counter and what each frame drew.

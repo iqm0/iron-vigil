@@ -103,12 +103,16 @@ layout(location=0) in vec2 aP; uniform mat4 uVP; uniform vec3 uCenter; out vec3 
 void main() { vP = vec3(aP.x * 90. + uCenter.x, 0., aP.y * 90. + uCenter.z); gl_Position = uVP * vec4(vP, 1.); }`;
 const FS_GROUND = `#version 300 es
 ${GLSL_LIGHT}
-uniform sampler2D uGA, uGN; uniform vec4 uYard; in vec3 vP; out vec4 o;
-void main() { vec2 uv = vP.xz / ${GT}.; vec4 a = texture(uGA, uv); vec2 n = texture(uGN, uv).rg * 2. - 1.; vec3 alb = a.rgb * a.rgb; float sp = a.a;
-  /* inside the fence it is concrete with a worn painted border; outside it is ploughed soil, furrows running north to south */
-  float d = max(max(uYard.x - vP.x, vP.x - uYard.y), max(uYard.z - vP.z, vP.z - uYard.w)), soil = smoothstep(.2, 1.1, d + (a.r - .3) * 1.2), fur = sin(vP.x * 3.9 + sin(vP.z * .21) * .7);
-  float line = (1. - smoothstep(.07, .13, abs(d + 1.1))) * step(.22, a.g) * (1. - soil); alb = mix(alb, vec3(.5, .36, .06), line * .55);
-  alb = mix(alb, vec3(.03, .021, .013) * (.6 + .5 * a.r) * (.75 + .25 * fur), soil); sp = mix(sp, .02, soil); n = mix(n, vec2(-cos(vP.x * 3.9 + sin(vP.z * .21) * .7) * .55, n.y * .5), soil);
+uniform sampler2D uGA, uGN; uniform vec4 uYard, uApron, uTrack; in vec3 vP; out vec4 o;
+float inside(vec4 r, vec2 p) { return max(max(r.x - p.x, p.x - r.y), max(r.z - p.y, p.y - r.w)); }       // below zero inside the rectangle (x0, x1, z0, z1)
+void main() { vec2 uv = vP.xz / ${GT}.; vec4 a = texture(uGA, uv); vec2 n = texture(uGN, uv).rg * 2. - 1.; float big = clamp((texture(uGA, uv * .17 + .37).r - .3) * 5., 0., 1.), mid = clamp((texture(uGA, uv * .61).g - .28) * 5., 0., 1.);
+  /* A farmyard, not a slab: packed dirt worn pale where it is walked on, a concrete apron only at the shed door, a gravel track with two ruts running out through the gate,
+     a road down the east side, a grass verge, and ploughed soil beyond with its furrows running north to south. No detail smaller than a bug. */
+  float dy = inside(uYard, vP.xz), ap = 1. - smoothstep(-.25, .25, inside(uApron, vP.xz)), tx = abs(vP.x - uTrack.x), tr = (1. - smoothstep(uTrack.y - .35, uTrack.y + .35, tx)) * step(uApron.w - .5, vP.z), rut = 1. - smoothstep(.1, .34, abs(tx - .8));
+  float rd = 1. - smoothstep(1.4, 1.9, abs(vP.x - uTrack.z)), verge = smoothstep(-.5, .3, dy + (mid - .5) * .6), soil = smoothstep(1.3, 2.1, dy + (big - .5)), fur = sin(vP.x * 3.9 + sin(vP.z * .21) * .7);
+  vec3 dirt = vec3(.125, .115, .1) * (.8 + .45 * big) * (1. + .22 * smoothstep(-3., -9., dy)), grav = vec3(.17, .167, .16) * (.82 + .3 * mid) * (1. - .4 * rut), grass = vec3(.05, .072, .034) * (.7 + .6 * mid), earth = vec3(.075, .058, .042) * (.75 + .4 * big) * (.8 + .2 * fur);
+  vec3 alb = mix(dirt, grav, tr); alb = mix(alb, grass, verge); alb = mix(alb, earth, soil); alb = mix(alb, grav, rd * verge); alb = mix(alb, a.rgb * a.rgb, ap);
+  float sp = mix(.03, a.a, ap); n = mix(n * .2, n, ap); n = mix(n, vec2(-cos(vP.x * 3.9 + sin(vP.z * .21) * .7) * .5, 0.), soil * (1. - rd));
   vec3 N = normalize(vec3(n.x, 1., n.y)); o = vec4(finish(lightAll(vP, N, alb, sp), vP), 1.); }`;
 /* the ground is painted once into a repeating texture, so the per-frame cost is two lookups */
 const VS_BAKE = `#version 300 es
@@ -126,10 +130,9 @@ void main() { vec2 p = vU * ${GT}.;
   float big = pf(p / 7., 4.), mid = pf(p * .5 + 9., 14.), grit = pn(p * 8., 224.) * .5 + pn(p * 16., 448.) * .5;
   vec3 alb = mix(vec3(.085, .08, .078), vec3(.21, .19, .165), clamp(big * .9 + mid * .45 - .2, 0., 1.)); alb *= .72 + .5 * grit;
   float rust = smoothstep(.56, .72, pf(p * .25 + 30., 7.)); alb = mix(alb, vec3(.2, .09, .04), rust * .45);
-  alb *= mix(.3, 1., smoothstep(0., .035, crackD(p))); float seam = smoothstep(.03, .09, seamD(p)); alb *= mix(.42, 1., seam);
+  alb *= mix(.62, 1., smoothstep(0., .035, crackD(p))); float seam = smoothstep(.03, .09, seamD(p)); alb *= mix(.66, 1., seam);
   float oil = smoothstep(.6, .74, pf(p * .25 + 60., 7.)); alb = mix(alb, vec3(.022, .022, .028), oil * .75);
   vec2 q = p / 7.; float lane = step(abs(fract(q.x + .5) - .5), .012) * step(fract(q.y * 1.75), .5) * step(.5, pn(floor(q * vec2(1., 1.75)) + 5., 4.));      // worn paint dashes
-  alb = mix(alb, vec3(.42, .33, .1), lane * (.35 + .4 * grit) * (1. - oil));
   o = vec4(sqrt(alb), .06 + oil * .9 + (1. - seam) * .08); }`;
 const VS_PART = `#version 300 es
 layout(location=0) in vec2 aC; layout(location=1) in vec3 iP; layout(location=2) in vec2 iS; layout(location=3) in vec3 iA; layout(location=4) in vec4 iC;
@@ -223,7 +226,7 @@ function renderScene(S, W, H) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shadowTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texGA); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texGN); gl.activeTexture(gl.TEXTURE0);
-  gl.useProgram(PROG.ground); setLightUniforms(PROG.ground, S); gl.uniform1i(PROG.ground.u.uGA, 1); gl.uniform1i(PROG.ground.u.uGN, 2); gl.uniform3fv(PROG.ground.u.uCenter, S.focus); gl.uniform4fv(PROG.ground.u.uYard, S.yard || [-1e4, 1e4, -1e4, 1e4]); gl.bindVertexArray(groundVAO); gl.disable(gl.CULL_FACE); gl.drawArrays(gl.TRIANGLES, 0, 6);
+  gl.useProgram(PROG.ground); setLightUniforms(PROG.ground, S); gl.uniform1i(PROG.ground.u.uGA, 1); gl.uniform1i(PROG.ground.u.uGN, 2); gl.uniform3fv(PROG.ground.u.uCenter, S.focus); gl.uniform4fv(PROG.ground.u.uYard, S.yard || [-1e4, 1e4, -1e4, 1e4]); gl.uniform4fv(PROG.ground.u.uApron, S.apron || [0, 0, 0, 0]); gl.uniform4fv(PROG.ground.u.uTrack, S.track || [1e4, 0, 1e4, 0]); gl.bindVertexArray(groundVAO); gl.disable(gl.CULL_FACE); gl.drawArrays(gl.TRIANGLES, 0, 6);
   // decals lie on the ground: contact shadows, splats, attack marks
   if (DEC.n) { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.useProgram(PROG.decal); gl.uniformMatrix4fv(PROG.decal.u.uVP, false, VP); gl.bindVertexArray(DEC.vao); gl.bindBuffer(gl.ARRAY_BUFFER, DEC.buf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, DEC.data, 0, DEC.n * 12); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, DEC.n); gl.depthMask(true); gl.disable(gl.BLEND); }
   gl.enable(gl.CULL_FACE); gl.useProgram(PROG.lit); setLightUniforms(PROG.lit, S); for (const m of meshes) if (m.n) { gl.bindVertexArray(m.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, m.count, m.n); }

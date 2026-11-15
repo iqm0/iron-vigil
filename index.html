@@ -73,7 +73,7 @@ button:disabled{opacity:.5;cursor:default}
 </head>
 <body>
 <main id="app">
-<canvas id="gl" role="img" aria-label="Game view. A walking machine with a headlamp and a heavy cannon defends a farm power relay from large insects at night. Events, choices and results are announced as text."></canvas>
+<canvas id="gl" role="img" aria-label="Game view. A piloted walking machine with a long cannon on one arm and a ram on the other defends a farmyard from large bladed insects at night. Events, choices and results are announced as text."></canvas>
 <canvas id="c" aria-hidden="true"></canvas>
 <div id="live" class="sr" aria-live="polite" aria-atomic="true"></div>
 <noscript><p style="padding:2rem">Last Light needs JavaScript to run.</p></noscript>
@@ -87,8 +87,8 @@ button:disabled{opacity:.5;cursor:default}
   </div>
   <div>
     <ul class="how" id="howTo">
-      <li>Drag to walk; the cannon aims itself. Hold the relay for three minutes, then kill what comes.</li>
-      <li>Dash to ram: it staggers the big ones and caves in burrows. Red on the ground is about to hurt.</li>
+      <li>Drag to walk; the cannon aims itself.</li>
+      <li>When it throws its blades wide, get off its line. Then ram it while they are stuck in the ground.</li>
     </ul>
     <p class="tag" id="found"></p>
     <button id="startBtn" class="go" data-autofocus>Start</button><br>
@@ -113,7 +113,7 @@ button:disabled{opacity:.5;cursor:default}
 </div>
 
 <div class="scr top" id="over" role="dialog" aria-modal="true" aria-labelledby="overT">
-  <h2 id="overT">Relay 09 lost</h2>
+  <h2 id="overT">Yard lost</h2>
   <div id="stats"></div>
   <button id="againBtn" class="go" data-autofocus>Again</button>
   <button id="setBtn3" class="alt">Settings &amp; accessibility</button>
